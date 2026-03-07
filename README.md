@@ -4,6 +4,7 @@ A mobile-first full-stack app to help new soldiers quickly learn names, faces, r
 
 ## Stack
 - Backend API: Node.js + Express
+- Database: PostgreSQL + Prisma
 - Mobile app: Expo React Native
 
 ## Unit Structure
@@ -12,9 +13,16 @@ A mobile-first full-stack app to help new soldiers quickly learn names, faces, r
 - Sections: `Section 1`, `Section 2`, `Section 3`
 
 ## 1) Run Backend API
+Make sure PostgreSQL is running and create the database:
+```bash
+createdb unit_directory
+```
+
+Then run:
 ```bash
 cd server
 npm install
+npm run db:setup
 npm run dev
 ```
 

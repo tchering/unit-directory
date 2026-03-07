@@ -5,6 +5,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import SectionScreen from "./src/screens/SectionScreen";
 import SoldierProfileScreen from "./src/screens/SoldierProfileScreen";
 import SearchScreen from "./src/screens/SearchScreen";
+import AddSoldierScreen from "./src/screens/AddSoldierScreen";
 import { colors } from "./src/theme";
 
 const Stack = createNativeStackNavigator();
@@ -38,6 +39,7 @@ export default function App() {
         <Stack.Screen name="Section" component={SectionScreen} options={({ route }) => ({ title: route.params.sectionName })} />
         <Stack.Screen name="Soldier" component={SoldierProfileScreen} options={{ title: "Soldier Profile" }} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ title: "Search Soldiers" }} />
+        <Stack.Screen name="AddSoldier" component={AddSoldierScreen} options={{ title: "Add Soldier" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

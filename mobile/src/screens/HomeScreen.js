@@ -29,6 +29,9 @@ export default function HomeScreen({ navigation }) {
       <Pressable style={styles.searchButton} onPress={() => navigation.navigate("Search")}>
         <Text style={styles.searchButtonText}>Search Soldiers</Text>
       </Pressable>
+      <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddSoldier")}>
+        <Text style={styles.addButtonText}>Add Soldier</Text>
+      </Pressable>
 
       <Text style={styles.title}>Sections</Text>
       {sections.map((section) => (
@@ -84,6 +87,19 @@ const styles = StyleSheet.create({
   searchButtonText: {
     color: "#19210f",
     fontWeight: "800"
+  },
+  addButton: {
+    marginTop: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center"
+  },
+  addButtonText: {
+    color: colors.text,
+    fontWeight: "700"
   },
   title: {
     color: colors.text,

@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Regiment {
+  id        Int       @id @default(autoincrement())
+  name      String
+  companies Company[]
+}
+
+model Company {
+  id         Int       @id @default(autoincrement())
+  name       String
+  regimentId Int
+  regiment   Regiment  @relation(fields: [regimentId], references: [id])
+  sections   Section[]
+
+  @@index([regimentId])
+}
+
+model Section {
+  id        String    @id
+  name      String
+  companyId Int
+  company   Company   @relation(fields: [companyId], references: [id])
+  soldiers  Soldier[]
+
+  @@index([companyId])
+}
+
+model Soldier {
+  id        String  @id
+  name      String
+  fullName  String
+  rank      String
+  role      String
+  photo     String
+  sectionId String
+  section   Section @relation(fields: [sectionId], references: [id])
+
+  @@index([sectionId])
+}
