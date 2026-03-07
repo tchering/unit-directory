@@ -2,8 +2,18 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { fetchJson } from "../api";
 import { colors } from "../theme";
+import { useAuth } from "../AuthContext";
+
+const ROLE_LABELS = {
+  ADMIN: "Administrateur",
+  MANAGER: "Gestionnaire",
+  VIEWER: "Lecteur"
+};
 
 export default function HomeScreen({ navigation }) {
+  const { session } = useAuth();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const isAdminLike = isAdmin || session?.user?.role === "MANAGER";
   const [unit, setUnit] = useState(null);
   const [sections, setSections] = useState([]);
 
@@ -21,17 +31,26 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Regiment</Text>
-        <Text style={styles.regiment}>{unit?.regiment || "Loading..."}</Text>
+        <Text style={styles.eyebrow}>Régiment</Text>
+        <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
         <Text style={styles.company}>{unit?.company || ""}</Text>
       </View>
 
       <Pressable style={styles.searchButton} onPress={() => navigation.navigate("Search")}>
-        <Text style={styles.searchButtonText}>Search Soldiers</Text>
+        <Text style={styles.searchButtonText}>Rechercher un militaire</Text>
       </Pressable>
-      <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddSoldier")}>
-        <Text style={styles.addButtonText}>Add Soldier</Text>
-      </Pressable>
+      {isAdminLike ? (
+        <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddSoldier")}>
+          <Text style={styles.addButtonText}>Ajouter un militaire</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.accessHint}>Connecté en {ROLE_LABELS[session?.user?.role] || session?.user?.role}. Écriture restreinte.</Text>
+      )}
+      {isAdmin ? (
+        <Pressable style={styles.manageButton} onPress={() => navigation.navigate("AdminUsers")}>
+          <Text style={styles.manageButtonText}>Gérer les rôles utilisateurs</Text>
+        </Pressable>
+      ) : null}
 
       <Text style={styles.title}>Sections</Text>
       {sections.map((section) => (
@@ -41,7 +60,7 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate("Section", { sectionId: section.id, sectionName: section.name })}
         >
           <Text style={styles.sectionName}>{section.name}</Text>
-          <Text style={styles.sectionMeta}>{section.soldierCount} soldiers</Text>
+          <Text style={styles.sectionMeta}>{section.soldierCount} militaires</Text>
         </Pressable>
       ))}
     </ScrollView>
@@ -99,6 +118,23 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: colors.text,
+    fontWeight: "700"
+  },
+  accessHint: {
+    color: colors.muted,
+    marginTop: 10
+  },
+  manageButton: {
+    marginTop: 10,
+    backgroundColor: "#243022",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#3d5237",
+    alignItems: "center"
+  },
+  manageButtonText: {
+    color: "#d8e8c5",
     fontWeight: "700"
   },
   title: {

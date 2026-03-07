@@ -6,6 +6,7 @@ A mobile-first full-stack app to help new soldiers quickly learn names, faces, r
 - Backend API: Node.js + Express
 - Database: PostgreSQL + Prisma
 - Mobile app: Expo React Native
+- Auth: JWT + role-based access (ADMIN / MANAGER / VIEWER)
 
 ## Unit Structure
 - Regiment: `3e Régiment du Matériel`
@@ -27,6 +28,22 @@ npm run dev
 ```
 
 API runs at `http://localhost:4000/api`.
+
+## Admin bootstrap
+Create or reset the first admin account:
+```bash
+cd server
+npm run admin:create -- your-admin@email.com your-strong-password
+```
+
+Then login in the mobile app using that account.
+
+## Registration + Roles
+- Users can register in-app with `email + password + password confirmation`.
+- All self-registered users are created as `VIEWER` (read-only).
+- Only `ADMIN` and `MANAGER` can add soldiers.
+- `VIEWER` users can log in and browse/search only.
+- `ADMIN` can open **Manage User Roles** in the app and promote/demote users (`VIEWER` / `MANAGER` / `ADMIN`).
 
 ## 2) Run Mobile App
 ```bash

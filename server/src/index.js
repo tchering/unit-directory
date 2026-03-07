@@ -1,15 +1,156 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./prisma.js";
+import { hashPassword, issueAuthTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
+import { requireAuth, requireRole } from "./authMiddleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-app.get("/api/unit", async (_req, res) => {
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: "200kb" }));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.post("/api/auth/register", authLimiter, asyncHandler(async (req, res) => {
+  const email = (req.body?.email || "").toString().trim().toLowerCase();
+  const password = (req.body?.password || "").toString();
+  const passwordConfirm = (req.body?.passwordConfirm || "").toString();
+
+  if (!email || !password || !passwordConfirm) {
+    res.status(400).json({ message: "email, password et passwordConfirm sont requis" });
+    return;
+  }
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.com$/.test(email);
+  if (!emailValid) {
+    res.status(400).json({ message: "L'email doit se terminer par .com" });
+    return;
+  }
+
+  if (password.length < 10) {
+    res.status(400).json({ message: "Le mot de passe doit contenir au moins 10 caractères" });
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    res.status(400).json({ message: "Les mots de passe ne correspondent pas" });
+    return;
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    res.status(409).json({ message: "Cet utilisateur existe déjà" });
+    return;
+  }
+
+  const createdUser = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await hashPassword(password),
+      role: "VIEWER",
+      isActive: true
+    },
+    select: {
+      id: true,
+      email: true,
+      role: true
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "REGISTER",
+      entity: "User",
+      entityId: createdUser.id,
+      actorId: createdUser.id,
+      details: {
+        role: createdUser.role
+      }
+    }
+  });
+
+  res.status(201).json({
+    message: "Inscription réussie",
+    user: createdUser
+  });
+}));
+
+app.post("/api/auth/login", authLimiter, asyncHandler(async (req, res) => {
+  const email = (req.body?.email || "").toString().trim().toLowerCase();
+  const password = (req.body?.password || "").toString();
+
+  if (!email || !password) {
+    res.status(400).json({ message: "email et mot de passe sont requis" });
+    return;
+  }
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !user.isActive) {
+    res.status(401).json({ message: "Identifiants invalides" });
+    return;
+  }
+
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok) {
+    res.status(401).json({ message: "Identifiants invalides" });
+    return;
+  }
+
+  const auth = await issueAuthTokens(user);
+  res.json(auth);
+}));
+
+app.post("/api/auth/refresh", authLimiter, asyncHandler(async (req, res) => {
+  const refreshToken = (req.body?.refreshToken || "").toString();
+  if (!refreshToken) {
+    res.status(400).json({ message: "refreshToken est requis" });
+    return;
+  }
+
+  const rotated = await rotateRefreshToken(refreshToken);
+  if (!rotated) {
+    res.status(401).json({ message: "refresh token invalide" });
+    return;
+  }
+
+  res.json(rotated);
+}));
+
+app.post("/api/auth/logout", authLimiter, asyncHandler(async (req, res) => {
+  const refreshToken = (req.body?.refreshToken || "").toString();
+  if (refreshToken) {
+    await revokeRefreshToken(refreshToken);
+  }
+  res.status(204).send();
+}));
+
+app.get("/api/auth/me", requireAuth, asyncHandler(async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.auth.userId },
+    select: { id: true, email: true, role: true, isActive: true }
+  });
+
+  if (!user || !user.isActive) {
+    res.status(401).json({ message: "Non autorisé" });
+    return;
+  }
+
+  res.json(user);
+}));
+
+app.get("/api/unit", asyncHandler(async (_req, res) => {
   const company = await prisma.company.findFirst({
     include: {
       regiment: true,
@@ -20,7 +161,7 @@ app.get("/api/unit", async (_req, res) => {
   });
 
   if (!company) {
-    res.status(404).json({ message: "Unit not found" });
+    res.status(404).json({ message: "Unité introuvable" });
     return;
   }
 
@@ -32,9 +173,9 @@ app.get("/api/unit", async (_req, res) => {
       name: section.name
     }))
   });
-});
+}));
 
-app.get("/api/sections", async (_req, res) => {
+app.get("/api/sections", asyncHandler(async (_req, res) => {
   const sections = await prisma.section.findMany({
     orderBy: { id: "asc" },
     include: {
@@ -51,9 +192,9 @@ app.get("/api/sections", async (_req, res) => {
       soldierCount: section._count.soldiers
     }))
   );
-});
+}));
 
-app.get("/api/sections/:sectionId/soldiers", async (req, res) => {
+app.get("/api/sections/:sectionId/soldiers", asyncHandler(async (req, res) => {
   const { sectionId } = req.params;
 
   const section = await prisma.section.findUnique({
@@ -61,7 +202,7 @@ app.get("/api/sections/:sectionId/soldiers", async (req, res) => {
   });
 
   if (!section) {
-    res.status(404).json({ message: "Section not found" });
+    res.status(404).json({ message: "Section introuvable" });
     return;
   }
 
@@ -80,9 +221,9 @@ app.get("/api/sections/:sectionId/soldiers", async (req, res) => {
       section: section.name
     }))
   });
-});
+}));
 
-app.get("/api/soldiers", async (req, res) => {
+app.get("/api/soldiers", asyncHandler(async (req, res) => {
   const query = (req.query.search || "").toString().trim();
 
   const result = await prisma.soldier.findMany({
@@ -108,23 +249,54 @@ app.get("/api/soldiers", async (req, res) => {
       rank: soldier.rank,
       role: soldier.role,
       photo: soldier.photo,
+      commandCategory: soldier.commandCategory,
       sectionId: soldier.sectionId,
       section: soldier.section.name
     }))
   );
-});
+}));
 
-app.post("/api/soldiers", async (req, res) => {
-  const { name, fullName, rank, role, photo, sectionId } = req.body || {};
+app.get("/api/soldiers/:id", asyncHandler(async (req, res) => {
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: req.params.id },
+    include: { section: true }
+  });
+
+  if (!soldier) {
+    res.status(404).json({ message: "Militaire introuvable" });
+    return;
+  }
+
+  res.json({
+    id: soldier.id,
+    name: soldier.name,
+    fullName: soldier.fullName,
+    rank: soldier.rank,
+    role: soldier.role,
+    photo: soldier.photo,
+    commandCategory: soldier.commandCategory,
+    sectionId: soldier.sectionId,
+    section: soldier.section.name
+  });
+}));
+
+app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const { name, fullName, rank, role, photo, sectionId, commandCategory } = req.body || {};
+  const validCategories = ["CHEF_DE_SECTION", "SOUS_OFFICIER_ADJOINT", "SERGENT", "MILITAIRE_DU_RANG"];
 
   if (!name || !fullName || !rank || !role || !photo || !sectionId) {
-    res.status(400).json({ message: "name, fullName, rank, role, photo, and sectionId are required" });
+    res.status(400).json({ message: "name, fullName, rank, role, photo et sectionId sont requis" });
+    return;
+  }
+
+  if (commandCategory && !validCategories.includes(commandCategory)) {
+    res.status(400).json({ message: "Catégorie de commandement invalide" });
     return;
   }
 
   const section = await prisma.section.findUnique({ where: { id: sectionId } });
   if (!section) {
-    res.status(400).json({ message: "Invalid sectionId" });
+    res.status(400).json({ message: "sectionId invalide" });
     return;
   }
 
@@ -136,7 +308,22 @@ app.post("/api/soldiers", async (req, res) => {
       rank: String(rank).trim(),
       role: String(role).trim(),
       photo: String(photo).trim(),
-      sectionId
+      commandCategory: commandCategory || "MILITAIRE_DU_RANG",
+      sectionId,
+      createdById: req.auth.userId
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "CREATE",
+      entity: "Soldier",
+      entityId: created.id,
+      actorId: req.auth.userId,
+      details: {
+        sectionId,
+        role: created.role
+      }
     }
   });
 
@@ -147,32 +334,135 @@ app.post("/api/soldiers", async (req, res) => {
     rank: created.rank,
     role: created.role,
     photo: created.photo,
+    commandCategory: created.commandCategory,
     sectionId: created.sectionId,
     section: section.name
   });
-});
+}));
 
-app.get("/api/soldiers/:id", async (req, res) => {
-  const soldier = await prisma.soldier.findUnique({
-    where: { id: req.params.id },
-    include: { section: true }
+app.get("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(async (_req, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      isActive: true,
+      createdAt: true
+    },
+    orderBy: { createdAt: "asc" }
   });
 
-  if (!soldier) {
-    res.status(404).json({ message: "Soldier not found" });
+  res.json(users);
+}));
+
+app.post("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(async (req, res) => {
+  const email = (req.body?.email || "").toString().trim().toLowerCase();
+  const password = (req.body?.password || "").toString();
+  const role = (req.body?.role || "VIEWER").toString().toUpperCase();
+
+  if (!email || !password || !["ADMIN", "MANAGER", "VIEWER"].includes(role)) {
+    res.status(400).json({ message: "email, mot de passe et rôle valide sont requis" });
     return;
   }
 
-  res.json({
-    id: soldier.id,
-    name: soldier.name,
-    fullName: soldier.fullName,
-    rank: soldier.rank,
-    role: soldier.role,
-    photo: soldier.photo,
-    sectionId: soldier.sectionId,
-    section: soldier.section.name
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    res.status(409).json({ message: "Cet utilisateur existe déjà" });
+    return;
+  }
+
+  const createdUser = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await hashPassword(password),
+      role
+    },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      isActive: true
+    }
   });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "CREATE",
+      entity: "User",
+      entityId: createdUser.id,
+      actorId: req.auth.userId,
+      details: { role: createdUser.role, email: createdUser.email }
+    }
+  });
+
+  res.status(201).json(createdUser);
+}));
+
+app.patch("/api/admin/users/:id", requireAuth, requireRole("ADMIN"), asyncHandler(async (req, res) => {
+  const role = req.body?.role ? req.body.role.toString().toUpperCase() : undefined;
+  const isActive = typeof req.body?.isActive === "boolean" ? req.body.isActive : undefined;
+
+  if (!role && typeof isActive !== "boolean") {
+    res.status(400).json({ message: "Fournir role et/ou isActive" });
+    return;
+  }
+
+  if (role && !["ADMIN", "MANAGER", "VIEWER"].includes(role)) {
+    res.status(400).json({ message: "Rôle invalide" });
+    return;
+  }
+
+  const targetUser = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!targetUser) {
+    res.status(404).json({ message: "Utilisateur introuvable" });
+    return;
+  }
+
+  const changingAwayFromAdmin = targetUser.role === "ADMIN" && role && role !== "ADMIN";
+  const deactivatingAdmin = targetUser.role === "ADMIN" && isActive === false;
+
+  if (changingAwayFromAdmin || deactivatingAdmin) {
+    const activeAdminCount = await prisma.user.count({
+      where: {
+        role: "ADMIN",
+        isActive: true
+      }
+    });
+
+    if (activeAdminCount <= 1 && targetUser.isActive) {
+      res.status(400).json({ message: "Au moins un administrateur actif est requis" });
+      return;
+    }
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: req.params.id },
+    data: {
+      ...(role ? { role } : {}),
+      ...(typeof isActive === "boolean" ? { isActive } : {})
+    },
+    select: { id: true, email: true, role: true, isActive: true }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE",
+      entity: "User",
+      entityId: updated.id,
+      actorId: req.auth.userId,
+      details: {
+        role: updated.role,
+        isActive: updated.isActive
+      }
+    }
+  });
+
+  res.json(updated);
+}));
+
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  res.status(500).json({ message: "Erreur interne du serveur" });
 });
 
 app.listen(PORT, () => {

@@ -10,12 +10,18 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev --name init",
     "db:seed": "node prisma/seed.js",
-    "db:setup": "npm run db:push && npm run db:seed"
+    "db:setup": "npm run db:push && npm run db:seed",
+    "admin:create": "node scripts/create-admin.js",
+    "db:backfill-category": "node scripts/backfill-command-category.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
     "prisma": "^6.16.3"
   }
 }

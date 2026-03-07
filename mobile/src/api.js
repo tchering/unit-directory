@@ -38,8 +38,23 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE
   || detectLanApiBase()
   || (Platform.OS === "android" ? LOCAL_ANDROID : LOCAL_DEFAULT);
 
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = token || null;
+}
+
+function buildHeaders(extraHeaders = {}) {
+  return {
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...extraHeaders
+  };
+}
+
 export async function fetchJson(path) {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: buildHeaders()
+  });
 
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
@@ -51,9 +66,34 @@ export async function fetchJson(path) {
 export async function postJson(path, payload) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: {
+    headers: buildHeaders({
       "Content-Type": "application/json"
-    },
+    }),
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    let message = `Request failed: ${response.status}`;
+    try {
+      const data = await response.json();
+      if (data?.message) {
+        message = data.message;
+      }
+    } catch (_error) {
+      // Keep fallback message when no JSON body exists.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function patchJson(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: buildHeaders({
+      "Content-Type": "application/json"
+    }),
     body: JSON.stringify(payload)
   });
 

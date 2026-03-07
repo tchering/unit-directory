@@ -2,8 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { fetchJson, postJson } from "../api";
 import { colors } from "../theme";
+import { useAuth } from "../AuthContext";
+
+const CATEGORIES = [
+  { value: "CHEF_DE_SECTION", label: "Chef de section" },
+  { value: "SOUS_OFFICIER_ADJOINT", label: "Sous-officier adjoint" },
+  { value: "SERGENT", label: "Sergent" },
+  { value: "MILITAIRE_DU_RANG", label: "Militaire du rang" }
+];
 
 export default function AddSoldierScreen({ navigation }) {
+  const { isAdminLike } = useAuth();
   const [sections, setSections] = useState([]);
   const [sectionId, setSectionId] = useState("section-1");
   const [name, setName] = useState("");
@@ -11,10 +20,16 @@ export default function AddSoldierScreen({ navigation }) {
   const [rank, setRank] = useState("");
   const [role, setRole] = useState("");
   const [photo, setPhoto] = useState("https://i.pravatar.cc/480?img=60");
+  const [commandCategory, setCommandCategory] = useState("MILITAIRE_DU_RANG");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!isAdminLike) {
+      setError("Seuls ADMIN et MANAGER peuvent ajouter des militaires.");
+      return;
+    }
+
     fetchJson("/sections")
       .then((data) => {
         setSections(data);
@@ -25,7 +40,7 @@ export default function AddSoldierScreen({ navigation }) {
       .catch((err) => {
         setError(err.message);
       });
-  }, []);
+  }, [isAdminLike]);
 
   const canSubmit = useMemo(() => {
     return name.trim() && fullName.trim() && rank.trim() && role.trim() && sectionId;
@@ -33,6 +48,10 @@ export default function AddSoldierScreen({ navigation }) {
 
   async function handleCreate() {
     if (!canSubmit || saving) {
+      return;
+    }
+    if (!isAdminLike) {
+      setError("Accès interdit");
       return;
     }
 
@@ -46,7 +65,8 @@ export default function AddSoldierScreen({ navigation }) {
         rank,
         role,
         sectionId,
-        photo
+        photo,
+        commandCategory
       });
       navigation.replace("Soldier", { soldierId: created.id });
     } catch (err) {
@@ -58,11 +78,24 @@ export default function AddSoldierScreen({ navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
-      <TextInput style={styles.input} placeholder="Card name (e.g. Soldat Paul Durand)" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="Full name" placeholderTextColor={colors.muted} value={fullName} onChangeText={setFullName} />
-      <TextInput style={styles.input} placeholder="Rank" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
-      <TextInput style={styles.input} placeholder="Role" placeholderTextColor={colors.muted} value={role} onChangeText={setRole} />
-      <TextInput style={styles.input} placeholder="Photo URL" placeholderTextColor={colors.muted} value={photo} onChangeText={setPhoto} autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Nom affiché (ex: Soldat Paul Durand)" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
+      <TextInput style={styles.input} placeholder="Nom complet" placeholderTextColor={colors.muted} value={fullName} onChangeText={setFullName} />
+      <TextInput style={styles.input} placeholder="Grade" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
+      <TextInput style={styles.input} placeholder="Fonction" placeholderTextColor={colors.muted} value={role} onChangeText={setRole} />
+      <TextInput style={styles.input} placeholder="URL photo" placeholderTextColor={colors.muted} value={photo} onChangeText={setPhoto} autoCapitalize="none" />
+
+      <Text style={styles.label}>Catégorie de commandement</Text>
+      <View style={styles.sectionWrap}>
+        {CATEGORIES.map((category) => (
+          <Pressable
+            key={category.value}
+            style={[styles.sectionChip, commandCategory === category.value && styles.sectionChipActive]}
+            onPress={() => setCommandCategory(category.value)}
+          >
+            <Text style={[styles.sectionText, commandCategory === category.value && styles.sectionTextActive]}>{category.label}</Text>
+          </Pressable>
+        ))}
+      </View>
 
       <Text style={styles.label}>Section</Text>
       <View style={styles.sectionWrap}>
@@ -80,7 +113,7 @@ export default function AddSoldierScreen({ navigation }) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={[styles.submit, (!canSubmit || saving) && styles.submitDisabled]} onPress={handleCreate}>
-        <Text style={styles.submitText}>{saving ? "Saving..." : "Create Soldier"}</Text>
+        <Text style={styles.submitText}>{saving ? "Enregistrement..." : "Créer le militaire"}</Text>
       </Pressable>
     </ScrollView>
   );

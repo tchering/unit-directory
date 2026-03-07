@@ -1,10 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 import { unit, soldiers } from "../src/data.js";
+import { hashPassword } from "../src/auth.js";
 
 const prisma = new PrismaClient();
 
 async function main() {
   await prisma.soldier.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.refreshToken.deleteMany();
+  await prisma.user.deleteMany();
   await prisma.section.deleteMany();
   await prisma.company.deleteMany();
   await prisma.regiment.deleteMany();
@@ -36,9 +40,26 @@ async function main() {
       rank: soldier.rank,
       role: soldier.role,
       photo: soldier.photo,
+      commandCategory: soldier.commandCategory || "MILITAIRE_DU_RANG",
       sectionId: soldier.sectionId
     }))
   });
+
+  const adminEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
+
+  if (adminEmail && adminPassword) {
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash: await hashPassword(adminPassword),
+        role: "ADMIN",
+        isActive: true
+      }
+    });
+  } else {
+    console.warn("[SEED] ADMIN_EMAIL / ADMIN_PASSWORD not set. No admin user created.");
+  }
 }
 
 main()

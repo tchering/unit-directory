@@ -20,13 +20,13 @@ export default function SearchScreen({ navigation }) {
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <TextInput
         style={styles.input}
-        placeholder="Search by name"
+        placeholder="Rechercher par nom"
         placeholderTextColor={colors.muted}
         value={query}
         onChangeText={setQuery}
       />
 
-      {results.length === 0 ? <Text style={styles.empty}>No matching soldiers.</Text> : null}
+      {results.length === 0 ? <Text style={styles.empty}>Aucun militaire trouvé.</Text> : null}
 
       {results.map((soldier) => (
         <SoldierCard

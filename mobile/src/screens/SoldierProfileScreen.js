@@ -3,6 +3,13 @@ import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { fetchJson } from "../api";
 import { colors } from "../theme";
 
+const CATEGORY_LABELS = {
+  CHEF_DE_SECTION: "Chef de section",
+  SOUS_OFFICIER_ADJOINT: "Sous-officier adjoint",
+  SERGENT: "Sergent",
+  MILITAIRE_DU_RANG: "Militaire du rang"
+};
+
 export default function SoldierProfileScreen({ route }) {
   const { soldierId } = route.params;
   const [soldier, setSoldier] = useState(null);
@@ -16,18 +23,19 @@ export default function SoldierProfileScreen({ route }) {
   }, [soldierId]);
 
   if (!soldier) {
-    return <Text style={styles.loading}>Loading profile...</Text>;
+    return <Text style={styles.loading}>Chargement du profil...</Text>;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <Image source={{ uri: soldier.photo }} style={styles.photo} />
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Soldier Profile</Text>
+        <Text style={styles.eyebrow}>Profil militaire</Text>
         <Text style={styles.name}>{soldier.fullName}</Text>
-        <Text style={styles.line}>Rank: {soldier.rank}</Text>
+        <Text style={styles.line}>Grade: {soldier.rank}</Text>
         <Text style={styles.line}>Section: {soldier.section}</Text>
-        <Text style={styles.line}>Role: {soldier.role}</Text>
+        <Text style={styles.line}>Fonction: {soldier.role}</Text>
+        <Text style={styles.line}>Catégorie: {CATEGORY_LABELS[soldier.commandCategory] || "Militaire du rang"}</Text>
       </View>
     </ScrollView>
   );
