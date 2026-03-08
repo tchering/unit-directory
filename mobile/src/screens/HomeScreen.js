@@ -10,7 +10,7 @@ const ROLE_LABELS = {
   MANAGER: "Gestionnaire",
   VIEWER: "Lecteur"
 };
-const REGIMENT_LOGO_URI = process.env.EXPO_PUBLIC_REGIMENT_LOGO_URI || "";
+const REGIMENT_LOGO = require("../../assets/insigne_3e_rmat.png");
 
 export default function HomeScreen({ navigation }) {
   const { session } = useAuth();
@@ -43,7 +43,7 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.panel}>
         <Text style={styles.eyebrow}>Régiment</Text>
         <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
-        {REGIMENT_LOGO_URI ? <Image source={{ uri: REGIMENT_LOGO_URI }} style={styles.logo} resizeMode="contain" /> : null}
+        <Image source={REGIMENT_LOGO} style={styles.logo} resizeMode="contain" />
         <Text style={styles.company}>{unit?.company || ""}</Text>
       </View>
 
