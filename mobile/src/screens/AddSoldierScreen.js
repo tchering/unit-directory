@@ -18,7 +18,6 @@ export default function AddSoldierScreen({ navigation }) {
   const [name, setName] = useState("");
   const [fullName, setFullName] = useState("");
   const [rank, setRank] = useState("");
-  const [role, setRole] = useState("");
   const [photo, setPhoto] = useState("https://i.pravatar.cc/480?img=60");
   const [commandCategory, setCommandCategory] = useState("MILITAIRE_DU_RANG");
   const [error, setError] = useState("");
@@ -43,8 +42,8 @@ export default function AddSoldierScreen({ navigation }) {
   }, [isAdminLike]);
 
   const canSubmit = useMemo(() => {
-    return name.trim() && fullName.trim() && rank.trim() && role.trim() && sectionId;
-  }, [fullName, name, rank, role, sectionId]);
+    return name.trim() && fullName.trim() && rank.trim() && sectionId;
+  }, [fullName, name, rank, sectionId]);
 
   async function handleCreate() {
     if (!canSubmit || saving) {
@@ -63,7 +62,6 @@ export default function AddSoldierScreen({ navigation }) {
         name,
         fullName,
         rank,
-        role,
         sectionId,
         photo,
         commandCategory
@@ -81,7 +79,6 @@ export default function AddSoldierScreen({ navigation }) {
       <TextInput style={styles.input} placeholder="Nom affiché (ex: Soldat Paul Durand)" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
       <TextInput style={styles.input} placeholder="Nom complet" placeholderTextColor={colors.muted} value={fullName} onChangeText={setFullName} />
       <TextInput style={styles.input} placeholder="Grade" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
-      <TextInput style={styles.input} placeholder="Fonction" placeholderTextColor={colors.muted} value={role} onChangeText={setRole} />
       <TextInput style={styles.input} placeholder="URL photo" placeholderTextColor={colors.muted} value={photo} onChangeText={setPhoto} autoCapitalize="none" />
 
       <Text style={styles.label}>Catégorie de commandement</Text>

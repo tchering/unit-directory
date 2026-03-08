@@ -38,7 +38,6 @@ model Soldier {
   name      String
   fullName  String
   rank      String
-  role      String
   photo     String
   commandCategory CommandCategory @default(MILITAIRE_DU_RANG)
   sectionId String

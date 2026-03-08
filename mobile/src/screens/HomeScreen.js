@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchJson } from "../api";
 import { colors } from "../theme";
@@ -10,6 +10,7 @@ const ROLE_LABELS = {
   MANAGER: "Gestionnaire",
   VIEWER: "Lecteur"
 };
+const REGIMENT_LOGO_URI = process.env.EXPO_PUBLIC_REGIMENT_LOGO_URI || "";
 
 export default function HomeScreen({ navigation }) {
   const { session } = useAuth();
@@ -42,6 +43,7 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.panel}>
         <Text style={styles.eyebrow}>Régiment</Text>
         <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
+        {REGIMENT_LOGO_URI ? <Image source={{ uri: REGIMENT_LOGO_URI }} style={styles.logo} resizeMode="contain" /> : null}
         <Text style={styles.company}>{unit?.company || ""}</Text>
       </View>
 
@@ -106,6 +108,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginTop: 6
+  },
+  logo: {
+    width: 110,
+    height: 150,
+    marginTop: 10,
+    alignSelf: "center"
   },
   company: {
     color: colors.muted,

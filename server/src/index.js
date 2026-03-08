@@ -247,7 +247,6 @@ app.get("/api/soldiers", asyncHandler(async (req, res) => {
       name: soldier.name,
       fullName: soldier.fullName,
       rank: soldier.rank,
-      role: soldier.role,
       photo: soldier.photo,
       commandCategory: soldier.commandCategory,
       sectionId: soldier.sectionId,
@@ -272,7 +271,6 @@ app.get("/api/soldiers/:id", asyncHandler(async (req, res) => {
     name: soldier.name,
     fullName: soldier.fullName,
     rank: soldier.rank,
-    role: soldier.role,
     photo: soldier.photo,
     commandCategory: soldier.commandCategory,
     sectionId: soldier.sectionId,
@@ -281,11 +279,11 @@ app.get("/api/soldiers/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
-  const { name, fullName, rank, role, photo, sectionId, commandCategory } = req.body || {};
+  const { name, fullName, rank, photo, sectionId, commandCategory } = req.body || {};
   const validCategories = ["CHEF_DE_SECTION", "SOUS_OFFICIER_ADJOINT", "SERGENT", "MILITAIRE_DU_RANG"];
 
-  if (!name || !fullName || !rank || !role || !photo || !sectionId) {
-    res.status(400).json({ message: "name, fullName, rank, role, photo et sectionId sont requis" });
+  if (!name || !fullName || !rank || !photo || !sectionId) {
+    res.status(400).json({ message: "name, fullName, rank, photo et sectionId sont requis" });
     return;
   }
 
@@ -306,7 +304,6 @@ app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHan
       name: String(name).trim(),
       fullName: String(fullName).trim(),
       rank: String(rank).trim(),
-      role: String(role).trim(),
       photo: String(photo).trim(),
       commandCategory: commandCategory || "MILITAIRE_DU_RANG",
       sectionId,
@@ -321,8 +318,7 @@ app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHan
       entityId: created.id,
       actorId: req.auth.userId,
       details: {
-        sectionId,
-        role: created.role
+        sectionId
       }
     }
   });
@@ -332,7 +328,6 @@ app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHan
     name: created.name,
     fullName: created.fullName,
     rank: created.rank,
-    role: created.role,
     photo: created.photo,
     commandCategory: created.commandCategory,
     sectionId: created.sectionId,

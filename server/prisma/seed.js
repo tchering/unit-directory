@@ -38,7 +38,6 @@ async function main() {
       name: soldier.name,
       fullName: soldier.fullName,
       rank: soldier.rank,
-      role: soldier.role,
       photo: soldier.photo,
       commandCategory: soldier.commandCategory || "MILITAIRE_DU_RANG",
       sectionId: soldier.sectionId

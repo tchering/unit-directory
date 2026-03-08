@@ -16,7 +16,6 @@ export const soldiers = [
     rank: "Caporal",
     section: "Section 1",
     sectionId: "section-1",
-    role: "Chef de section",
     commandCategory: "CHEF_DE_SECTION",
     photo: "https://i.pravatar.cc/480?img=12"
   },
@@ -27,7 +26,6 @@ export const soldiers = [
     rank: "Soldat",
     section: "Section 1",
     sectionId: "section-1",
-    role: "Plieur parachute",
     commandCategory: "MILITAIRE_DU_RANG",
     photo: "https://i.pravatar.cc/480?img=14"
   },
@@ -38,7 +36,6 @@ export const soldiers = [
     rank: "Sergent",
     section: "Section 1",
     sectionId: "section-1",
-    role: "Chef d'équipe logistique",
     commandCategory: "SERGENT",
     photo: "https://i.pravatar.cc/480?img=16"
   },
@@ -49,7 +46,6 @@ export const soldiers = [
     rank: "Caporal",
     section: "Section 2",
     sectionId: "section-2",
-    role: "Technicien véhicule",
     commandCategory: "MILITAIRE_DU_RANG",
     photo: "https://i.pravatar.cc/480?img=32"
   },
@@ -60,7 +56,6 @@ export const soldiers = [
     rank: "Soldat",
     section: "Section 2",
     sectionId: "section-2",
-    role: "Plieur parachute",
     commandCategory: "MILITAIRE_DU_RANG",
     photo: "https://i.pravatar.cc/480?img=35"
   },
@@ -71,7 +66,6 @@ export const soldiers = [
     rank: "Adjudant",
     section: "Section 2",
     sectionId: "section-2",
-    role: "Sous-officier adjoint",
     commandCategory: "SOUS_OFFICIER_ADJOINT",
     photo: "https://i.pravatar.cc/480?img=36"
   },
@@ -82,7 +76,6 @@ export const soldiers = [
     rank: "Sergent",
     section: "Section 3",
     sectionId: "section-3",
-    role: "Sergent instructeur",
     commandCategory: "SERGENT",
     photo: "https://i.pravatar.cc/480?img=52"
   },
@@ -93,7 +86,6 @@ export const soldiers = [
     rank: "Soldat",
     section: "Section 3",
     sectionId: "section-3",
-    role: "Opératrice radio",
     commandCategory: "MILITAIRE_DU_RANG",
     photo: "https://i.pravatar.cc/480?img=48"
   },
@@ -104,7 +96,6 @@ export const soldiers = [
     rank: "Caporal",
     section: "Section 3",
     sectionId: "section-3",
-    role: "Spécialiste approvisionnement",
     commandCategory: "MILITAIRE_DU_RANG",
     photo: "https://i.pravatar.cc/480?img=58"
   }

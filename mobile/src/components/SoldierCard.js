@@ -8,7 +8,6 @@ export default function SoldierCard({ soldier, onPress }) {
       <View style={styles.content}>
         <Text style={styles.name}>{soldier.name}</Text>
         <Text style={styles.rank}>{soldier.rank}</Text>
-        <Text style={styles.role}>{soldier.role}</Text>
       </View>
     </Pressable>
   );
@@ -44,10 +43,5 @@ const styles = StyleSheet.create({
   rank: {
     color: colors.muted,
     marginTop: 2
-  },
-  role: {
-    color: colors.accent,
-    marginTop: 2,
-    fontWeight: "600"
   }
 });

@@ -113,7 +113,6 @@ export default function SoldierProfileScreen({ route, navigation }) {
         <Text style={styles.name}>{soldier.fullName}</Text>
         <Text style={styles.line}>Grade: {soldier.rank}</Text>
         <Text style={styles.line}>Section: {soldier.section}</Text>
-        <Text style={styles.line}>Fonction: {soldier.role}</Text>
         <Text style={styles.line}>Catégorie: {CATEGORY_LABELS[soldier.commandCategory] || "MDR"}</Text>
       </View>
 

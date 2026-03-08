@@ -3,13 +3,9 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 function inferCategory(soldier) {
-  const role = (soldier.role || "").toLowerCase();
   const rank = (soldier.rank || "").toLowerCase();
 
-  if (role.includes("chef de section")) {
-    return "CHEF_DE_SECTION";
-  }
-  if (role.includes("sous-officier adjoint") || rank.includes("adjudant")) {
+  if (rank.includes("adjudant")) {
     return "SOUS_OFFICIER_ADJOINT";
   }
   if (rank.includes("sergent")) {
