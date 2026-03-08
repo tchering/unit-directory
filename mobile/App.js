@@ -13,7 +13,7 @@ import RegisterScreen from "./src/screens/RegisterScreen";
 import AdminUsersScreen from "./src/screens/AdminUsersScreen";
 import { colors } from "./src/theme";
 import { clearSession, loadSession, saveSession } from "./src/authStorage";
-import { fetchJson, postJson, setAccessToken } from "./src/api";
+import { fetchJson, postJson, setAccessToken, setTokenRefreshHandler } from "./src/api";
 import { AuthContext } from "./src/AuthContext";
 
 const Stack = createNativeStackNavigator();
@@ -65,7 +65,7 @@ export default function App() {
     async signOut() {
       try {
         if (session?.refreshToken) {
-          await postJson("/auth/logout", { refreshToken: session.refreshToken });
+          await postJson("/auth/logout", { refreshToken: session.refreshToken }, { skipRefresh: true, retryOn401: false });
         }
       } catch (_error) {
         // Best effort logout.
@@ -74,6 +74,28 @@ export default function App() {
       setSession(null);
       setAccessToken(null);
       await clearSession();
+    },
+    async refreshSessionToken() {
+      if (!session?.refreshToken) {
+        return false;
+      }
+
+      try {
+        const next = await postJson(
+          "/auth/refresh",
+          { refreshToken: session.refreshToken },
+          { skipRefresh: true, retryOn401: false }
+        );
+        setSession(next);
+        setAccessToken(next.accessToken);
+        await saveSession(next);
+        return true;
+      } catch (_error) {
+        setSession(null);
+        setAccessToken(null);
+        await clearSession();
+        return false;
+      }
     },
     async refreshMe() {
       if (!session?.accessToken) {
@@ -92,6 +114,11 @@ export default function App() {
       await saveSession(next);
     }
   }), [session]);
+
+  useEffect(() => {
+    setTokenRefreshHandler(authValue.refreshSessionToken);
+    return () => setTokenRefreshHandler(null);
+  }, [authValue]);
 
   if (loading) {
     return null;

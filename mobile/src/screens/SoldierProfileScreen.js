@@ -5,9 +5,9 @@ import { colors } from "../theme";
 
 const CATEGORY_LABELS = {
   CHEF_DE_SECTION: "Chef de section",
-  SOUS_OFFICIER_ADJOINT: "Sous-officier adjoint",
+  SOUS_OFFICIER_ADJOINT: "SOA",
   SERGENT: "Sergent",
-  MILITAIRE_DU_RANG: "Militaire du rang"
+  MILITAIRE_DU_RANG: "MDR"
 };
 
 export default function SoldierProfileScreen({ route }) {
@@ -35,7 +35,7 @@ export default function SoldierProfileScreen({ route }) {
         <Text style={styles.line}>Grade: {soldier.rank}</Text>
         <Text style={styles.line}>Section: {soldier.section}</Text>
         <Text style={styles.line}>Fonction: {soldier.role}</Text>
-        <Text style={styles.line}>Catégorie: {CATEGORY_LABELS[soldier.commandCategory] || "Militaire du rang"}</Text>
+        <Text style={styles.line}>Catégorie: {CATEGORY_LABELS[soldier.commandCategory] || "MDR"}</Text>
       </View>
     </ScrollView>
   );

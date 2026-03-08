@@ -6,9 +6,9 @@ import { colors } from "../theme";
 
 const GROUPS = [
   { key: "CHEF_DE_SECTION", label: "Chef de section" },
-  { key: "SOUS_OFFICIER_ADJOINT", label: "Sous-officier adjoint" },
-  { key: "SERGENT", label: "Sergents" },
-  { key: "MILITAIRE_DU_RANG", label: "Militaires du rang" }
+  { key: "SOUS_OFFICIER_ADJOINT", label: "SOA" },
+  { key: "SERGENT", label: "Sergent" },
+  { key: "MILITAIRE_DU_RANG", label: "MDR" }
 ];
 
 export default function SectionScreen({ navigation, route }) {
@@ -46,7 +46,7 @@ export default function SectionScreen({ navigation, route }) {
         <View key={group.key} style={styles.group}>
           <Text style={styles.groupTitle}>{group.label}</Text>
           {group.soldiers.length === 0 ? (
-            <Text style={styles.empty}>Aucun militaire dans cette catégorie.</Text>
+            <Text style={styles.empty}>Aucun militaire.</Text>
           ) : (
             group.soldiers.map((soldier) => (
               <SoldierCard

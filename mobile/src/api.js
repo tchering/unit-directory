@@ -39,9 +39,14 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE
   || (Platform.OS === "android" ? LOCAL_ANDROID : LOCAL_DEFAULT);
 
 let accessToken = null;
+let refreshHandler = null;
 
 export function setAccessToken(token) {
   accessToken = token || null;
+}
+
+export function setTokenRefreshHandler(handler) {
+  refreshHandler = handler || null;
 }
 
 function buildHeaders(extraHeaders = {}) {
@@ -51,64 +56,56 @@ function buildHeaders(extraHeaders = {}) {
   };
 }
 
-export async function fetchJson(path) {
+async function buildError(response) {
+  let message = `Requête échouée: ${response.status}`;
+  try {
+    const data = await response.json();
+    if (data?.message) {
+      message = data.message;
+    }
+  } catch (_error) {
+    // Ignore non-JSON error bodies.
+  }
+  return new Error(message);
+}
+
+async function requestJson(method, path, payload, options = {}) {
+  const { retryOn401 = true, skipRefresh = false } = options;
+
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: buildHeaders()
+    method,
+    headers: buildHeaders(
+      payload ? { "Content-Type": "application/json" } : {}
+    ),
+    ...(payload ? { body: JSON.stringify(payload) } : {})
   });
 
+  if (response.status === 401 && retryOn401 && !skipRefresh && refreshHandler) {
+    const refreshed = await refreshHandler();
+    if (refreshed) {
+      return requestJson(method, path, payload, { retryOn401: false, skipRefresh });
+    }
+  }
+
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw await buildError(response);
+  }
+
+  if (response.status === 204) {
+    return null;
   }
 
   return response.json();
 }
 
-export async function postJson(path, payload) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: buildHeaders({
-      "Content-Type": "application/json"
-    }),
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data?.message) {
-        message = data.message;
-      }
-    } catch (_error) {
-      // Keep fallback message when no JSON body exists.
-    }
-    throw new Error(message);
-  }
-
-  return response.json();
+export function fetchJson(path, options = {}) {
+  return requestJson("GET", path, undefined, options);
 }
 
-export async function patchJson(path, payload) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: "PATCH",
-    headers: buildHeaders({
-      "Content-Type": "application/json"
-    }),
-    body: JSON.stringify(payload)
-  });
+export function postJson(path, payload, options = {}) {
+  return requestJson("POST", path, payload, options);
+}
 
-  if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data?.message) {
-        message = data.message;
-      }
-    } catch (_error) {
-      // Keep fallback message when no JSON body exists.
-    }
-    throw new Error(message);
-  }
-
-  return response.json();
+export function patchJson(path, payload, options = {}) {
+  return requestJson("PATCH", path, payload, options);
 }

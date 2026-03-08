@@ -6,9 +6,9 @@ import { useAuth } from "../AuthContext";
 
 const CATEGORIES = [
   { value: "CHEF_DE_SECTION", label: "Chef de section" },
-  { value: "SOUS_OFFICIER_ADJOINT", label: "Sous-officier adjoint" },
+  { value: "SOUS_OFFICIER_ADJOINT", label: "SOA" },
   { value: "SERGENT", label: "Sergent" },
-  { value: "MILITAIRE_DU_RANG", label: "Militaire du rang" }
+  { value: "MILITAIRE_DU_RANG", label: "MDR" }
 ];
 
 export default function AddSoldierScreen({ navigation }) {
