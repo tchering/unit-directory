@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { fetchJson } from "../api";
 import { colors } from "../theme";
 import { useAuth } from "../AuthContext";
@@ -16,17 +17,25 @@ export default function HomeScreen({ navigation }) {
   const isAdminLike = isAdmin || session?.user?.role === "MANAGER";
   const [unit, setUnit] = useState(null);
   const [sections, setSections] = useState([]);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadHome = useCallback(() => {
+    setError("");
     Promise.all([fetchJson("/unit"), fetchJson("/sections")])
       .then(([unitData, sectionData]) => {
         setUnit(unitData);
         setSections(sectionData);
       })
-      .catch((error) => {
-        console.error(error);
+      .catch((err) => {
+        setError(err.message);
       });
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHome();
+    }, [loadHome])
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
@@ -35,6 +44,13 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
         <Text style={styles.company}>{unit?.company || ""}</Text>
       </View>
+
+      <View style={styles.userPanel}>
+        <Text style={styles.userLabel}>Connecté en tant que</Text>
+        <Text style={styles.userValue}>{session?.user?.email || "Inconnu"}</Text>
+        <Text style={styles.userRole}>Rôle: {ROLE_LABELS[session?.user?.role] || session?.user?.role}</Text>
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={styles.searchButton} onPress={() => navigation.navigate("Search")}>
         <Text style={styles.searchButtonText}>Rechercher un militaire</Text>
@@ -95,6 +111,34 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 2,
     fontSize: 16
+  },
+  userPanel: {
+    marginTop: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12
+  },
+  userLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.8
+  },
+  userValue: {
+    color: colors.text,
+    fontWeight: "800",
+    marginTop: 4
+  },
+  userRole: {
+    color: colors.accent,
+    marginTop: 4,
+    fontWeight: "700"
+  },
+  error: {
+    color: "#ff9191",
+    marginTop: 10
   },
   searchButton: {
     marginTop: 14,

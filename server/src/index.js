@@ -340,6 +340,107 @@ app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHan
   });
 }));
 
+app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const validCategories = ["CHEF_DE_SECTION", "SOUS_OFFICIER_ADJOINT", "SERGENT", "MILITAIRE_DU_RANG"];
+  const sectionId = req.body?.sectionId ? String(req.body.sectionId) : undefined;
+  const commandCategory = req.body?.commandCategory ? String(req.body.commandCategory) : undefined;
+
+  if (!sectionId && !commandCategory) {
+    res.status(400).json({ message: "Fournir sectionId et/ou commandCategory" });
+    return;
+  }
+
+  if (commandCategory && !validCategories.includes(commandCategory)) {
+    res.status(400).json({ message: "Catégorie de commandement invalide" });
+    return;
+  }
+
+  const existing = await prisma.soldier.findUnique({
+    where: { id: req.params.id },
+    include: { section: true }
+  });
+
+  if (!existing) {
+    res.status(404).json({ message: "Militaire introuvable" });
+    return;
+  }
+
+  let nextSection = existing.section;
+  if (sectionId) {
+    const section = await prisma.section.findUnique({ where: { id: sectionId } });
+    if (!section) {
+      res.status(400).json({ message: "sectionId invalide" });
+      return;
+    }
+    nextSection = section;
+  }
+
+  const updated = await prisma.soldier.update({
+    where: { id: existing.id },
+    data: {
+      ...(sectionId ? { sectionId } : {}),
+      ...(commandCategory ? { commandCategory } : {})
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE",
+      entity: "Soldier",
+      entityId: updated.id,
+      actorId: req.auth.userId,
+      details: {
+        fromSectionId: existing.sectionId,
+        toSectionId: updated.sectionId,
+        fromCommandCategory: existing.commandCategory,
+        toCommandCategory: updated.commandCategory
+      }
+    }
+  });
+
+  res.json({
+    id: updated.id,
+    name: updated.name,
+    fullName: updated.fullName,
+    rank: updated.rank,
+    role: updated.role,
+    photo: updated.photo,
+    commandCategory: updated.commandCategory,
+    sectionId: updated.sectionId,
+    section: nextSection.name
+  });
+}));
+
+app.delete("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: req.params.id }
+  });
+
+  if (!soldier) {
+    res.status(404).json({ message: "Militaire introuvable" });
+    return;
+  }
+
+  await prisma.soldier.delete({
+    where: { id: soldier.id }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "DELETE",
+      entity: "Soldier",
+      entityId: soldier.id,
+      actorId: req.auth.userId,
+      details: {
+        sectionId: soldier.sectionId,
+        commandCategory: soldier.commandCategory
+      }
+    }
+  });
+
+  res.status(204).send();
+}));
+
 app.get("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(async (_req, res) => {
   const users = await prisma.user.findMany({
     select: {

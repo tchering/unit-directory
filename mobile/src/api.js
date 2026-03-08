@@ -109,3 +109,7 @@ export function postJson(path, payload, options = {}) {
 export function patchJson(path, payload, options = {}) {
   return requestJson("PATCH", path, payload, options);
 }
+
+export function deleteJson(path, options = {}) {
+  return requestJson("DELETE", path, undefined, options);
+}

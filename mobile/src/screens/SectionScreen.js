@@ -1,5 +1,6 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import SoldierCard from "../components/SoldierCard";
 import { fetchJson } from "../api";
 import { colors } from "../theme";
@@ -14,14 +15,22 @@ const GROUPS = [
 export default function SectionScreen({ navigation, route }) {
   const { sectionId } = route.params;
   const [data, setData] = useState(null);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadSection = useCallback(() => {
+    setError("");
     fetchJson(`/sections/${sectionId}/soldiers`)
       .then(setData)
-      .catch((error) => {
-        console.error(error);
+      .catch((err) => {
+        setError(err.message);
       });
   }, [sectionId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSection();
+    }, [loadSection])
+  );
 
   const grouped = useMemo(() => {
     if (!data?.soldiers) {
@@ -42,6 +51,7 @@ export default function SectionScreen({ navigation, route }) {
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       {grouped.map((group) => (
         <View key={group.key} style={styles.group}>
           <Text style={styles.groupTitle}>{group.label}</Text>
@@ -83,5 +93,9 @@ const styles = StyleSheet.create({
   empty: {
     color: colors.muted,
     marginBottom: 8
+  },
+  error: {
+    color: "#ff9191",
+    marginBottom: 10
   }
 });
