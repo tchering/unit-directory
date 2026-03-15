@@ -62,9 +62,14 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.searchButtonText}>Rechercher un militaire</Text>
       </Pressable>
       {isAdminLike ? (
-        <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddSoldier")}>
-          <Text style={styles.addButtonText}>Ajouter un militaire</Text>
-        </Pressable>
+        <>
+          <Pressable style={styles.addButton} onPress={() => navigation.navigate("AddSoldier")}>
+            <Text style={styles.addButtonText}>Ajouter un militaire</Text>
+          </Pressable>
+          <Pressable style={styles.credentialButton} onPress={() => navigation.navigate("IssuedCredentials")}>
+            <Text style={styles.credentialButtonText}>Identifiants créés</Text>
+          </Pressable>
+        </>
       ) : (
         <Text style={styles.accessHint}>Connecté en {ROLE_LABELS[session?.user?.role] || session?.user?.role}. Écriture restreinte.</Text>
       )}
@@ -181,6 +186,19 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: colors.text,
+    fontWeight: "700"
+  },
+  credentialButton: {
+    marginTop: 10,
+    backgroundColor: "#1f2f2f",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#365252",
+    alignItems: "center"
+  },
+  credentialButtonText: {
+    color: "#d4ebeb",
     fontWeight: "700"
   },
   accessHint: {

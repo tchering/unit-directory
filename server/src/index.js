@@ -6,6 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "./prisma.js";
 import { hashPassword, issueAuthTokens, revokeAllUserRefreshTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
 import { requireAuth, requireRole } from "./authMiddleware.js";
+import { decryptTemporaryPassword, encryptTemporaryPassword } from "./credentialsCrypto.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -181,6 +182,16 @@ app.post("/api/auth/change-password-first-login", requireAuth, asyncHandler(asyn
     data: {
       passwordHash: await hashPassword(newPassword),
       mustChangePassword: false
+    }
+  });
+
+  await prisma.issuedCredential.updateMany({
+    where: {
+      userId: user.id,
+      passwordChangedAt: null
+    },
+    data: {
+      passwordChangedAt: new Date()
     }
   });
 
@@ -403,6 +414,16 @@ app.post("/api/users/soldier-account", requireAuth, requireRole("ADMIN", "MANAGE
       }
     });
 
+    await tx.issuedCredential.create({
+      data: {
+        userId: user.id,
+        soldierId: soldier.id,
+        usernameSnapshot: user.username || username,
+        encryptedTempPassword: encryptTemporaryPassword(temporaryPassword),
+        createdById: req.auth.userId
+      }
+    });
+
     await tx.auditLog.create({
       data: {
         action: "CREATE_SOLDIER_ACCOUNT",
@@ -426,6 +447,56 @@ app.post("/api/users/soldier-account", requireAuth, requireRole("ADMIN", "MANAGE
     username: created.user.username,
     temporaryPassword
   });
+}));
+
+app.get("/api/users/issued-credentials", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const rows = await prisma.issuedCredential.findMany({
+    include: {
+      soldier: {
+        select: {
+          id: true,
+          fullName: true,
+          name: true,
+          rank: true
+        }
+      },
+      createdBy: {
+        select: {
+          id: true,
+          username: true
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 300
+  });
+
+  await prisma.issuedCredential.updateMany({
+    where: { id: { in: rows.map((row) => row.id) } },
+    data: { lastViewedAt: new Date() }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "VIEW_CREDENTIALS",
+      entity: "IssuedCredential",
+      actorId: req.auth.userId,
+      details: { count: rows.length }
+    }
+  });
+
+  res.json(rows.map((row) => ({
+    id: row.id,
+    soldierId: row.soldierId,
+    soldierName: row.soldier.fullName || row.soldier.name,
+    rank: row.soldier.rank,
+    username: row.usernameSnapshot,
+    temporaryPassword: row.passwordChangedAt ? null : decryptTemporaryPassword(row.encryptedTempPassword),
+    createdAt: row.createdAt,
+    createdBy: row.createdBy.username || row.createdBy.id,
+    passwordChangedAt: row.passwordChangedAt,
+    status: row.passwordChangedAt ? "PASSWORD_CHANGED" : "TEMP_PASSWORD_ACTIVE"
+  })));
 }));
 
 app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {

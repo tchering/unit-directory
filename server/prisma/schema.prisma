@@ -44,6 +44,7 @@ model Soldier {
   section   Section @relation(fields: [sectionId], references: [id])
   createdById String?
   createdBy   User? @relation("CreatedBy", fields: [createdById], references: [id])
+  issuedCredentials IssuedCredential[]
 
   @@index([sectionId])
   @@index([createdById])
@@ -62,6 +63,29 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   createdSoldiers Soldier[]    @relation("CreatedBy")
+  createdCredentials IssuedCredential[] @relation("CredentialCreatedBy")
+  issuedCredentials IssuedCredential[] @relation("CredentialForUser")
+}
+
+model IssuedCredential {
+  id                     String   @id @default(uuid())
+  userId                 String
+  soldierId              String
+  usernameSnapshot       String
+  encryptedTempPassword  String
+  createdById            String
+  createdAt              DateTime @default(now())
+  passwordChangedAt      DateTime?
+  lastViewedAt           DateTime?
+
+  user                   User     @relation("CredentialForUser", fields: [userId], references: [id])
+  soldier                Soldier  @relation(fields: [soldierId], references: [id])
+  createdBy              User     @relation("CredentialCreatedBy", fields: [createdById], references: [id])
+
+  @@index([createdById])
+  @@index([userId])
+  @@index([soldierId])
+  @@index([createdAt])
 }
 
 model RefreshToken {

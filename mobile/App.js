@@ -11,6 +11,7 @@ import AddSoldierScreen from "./src/screens/AddSoldierScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import ChangePasswordScreen from "./src/screens/ChangePasswordScreen";
 import AdminUsersScreen from "./src/screens/AdminUsersScreen";
+import IssuedCredentialsScreen from "./src/screens/IssuedCredentialsScreen";
 import { colors } from "./src/theme";
 import { clearSession, loadSession, saveSession } from "./src/authStorage";
 import { fetchJson, postJson, setAccessToken, setTokenRefreshHandler } from "./src/api";
@@ -178,6 +179,7 @@ export default function App() {
               <Stack.Screen name="Soldier" component={SoldierProfileScreen} options={{ title: "Profil militaire" }} />
               <Stack.Screen name="Search" component={SearchScreen} options={{ title: "Rechercher un militaire" }} />
               <Stack.Screen name="AddSoldier" component={AddSoldierScreen} options={{ title: "Ajouter un militaire" }} />
+              <Stack.Screen name="IssuedCredentials" component={IssuedCredentialsScreen} options={{ title: "Identifiants créés" }} />
               <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: "Gérer les utilisateurs" }} />
             </>
           )}
