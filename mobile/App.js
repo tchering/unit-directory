@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Pressable, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as Notifications from "expo-notifications";
 import HomeScreen from "./src/screens/HomeScreen";
 import SectionScreen from "./src/screens/SectionScreen";
 import SoldierProfileScreen from "./src/screens/SoldierProfileScreen";
@@ -18,8 +19,19 @@ import { colors } from "./src/theme";
 import { clearSession, loadSession, saveSession } from "./src/authStorage";
 import { fetchJson, postJson, setAccessToken, setTokenRefreshHandler } from "./src/api";
 import { AuthContext } from "./src/AuthContext";
+import { registerPushTokenOnBackend, unregisterPushTokenOnBackend } from "./src/pushNotifications";
 
 const Stack = createNativeStackNavigator();
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true
+  })
+});
 
 const navTheme = {
   ...DefaultTheme,
@@ -72,6 +84,7 @@ export default function App() {
     },
     async signOut() {
       try {
+        await unregisterPushTokenOnBackend(postJson);
         if (session?.refreshToken) {
           await postJson("/auth/logout", { refreshToken: session.refreshToken }, { skipRefresh: true, retryOn401: false });
         }
@@ -129,6 +142,27 @@ export default function App() {
     setTokenRefreshHandler(authValue.refreshSessionToken);
     return () => setTokenRefreshHandler(null);
   }, [authValue]);
+
+  useEffect(() => {
+    if (!session?.accessToken || requiresPasswordChange) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!cancelled) {
+          await registerPushTokenOnBackend(postJson);
+        }
+      } catch (_error) {
+        // Ignore push setup failures in app flow.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, requiresPasswordChange]);
 
   if (loading) {
     return null;

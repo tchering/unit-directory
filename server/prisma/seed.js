@@ -5,6 +5,7 @@ import { hashPassword } from "../src/auth.js";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.devicePushToken.deleteMany();
   await prisma.announcementRead.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.soldier.deleteMany();

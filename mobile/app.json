@@ -10,7 +10,11 @@
       "backgroundColor": "#0d120f"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Cette application envoie des notifications pour les nouvelles annonces de l'unité."
+      },
+      "bundleIdentifier": "com.anonymous.unit-directory"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,8 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ]
   }
 }

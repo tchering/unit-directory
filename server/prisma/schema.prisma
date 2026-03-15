@@ -68,6 +68,7 @@ model User {
   issuedCredentials IssuedCredential[] @relation("CredentialForUser")
   createdAnnouncements Announcement[] @relation("AnnouncementCreatedBy")
   announcementReads AnnouncementRead[]
+  pushTokens     DevicePushToken[]
 }
 
 model Announcement {
@@ -135,6 +136,20 @@ model RefreshToken {
   createdAt  DateTime  @default(now())
 
   @@index([userId])
+}
+
+model DevicePushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  platform   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId, isActive])
 }
 
 model AuditLog {

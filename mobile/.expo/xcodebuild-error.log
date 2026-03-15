@@ -1,0 +1,10 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, id:1AF41390-E928-472A-93CD-210BFDF42F5F, OS:18.2, name:iPhone 16 Pro Max }
+{ platform:iOS Simulator, id:1AF41390-E928-472A-93CD-210BFDF42F5F, OS:18.2, name:iPhone 16 Pro Max }
+** BUILD FAILED **
+
+
+The following build commands failed:
+	CompileAssetCatalogVariant thinned /Users/sonamsherpa/Library/Developer/Xcode/DerivedData/UnitDirectory-etexpdvqticaksdruqxuzyzehpaf/Build/Products/Debug-iphonesimulator/expo-dev-launcher/EXDevLauncher.bundle /Users/sonamsherpa/Documents/New\ project/mobile/node_modules/expo-dev-launcher/ios/Assets.xcassets (in target 'expo-dev-launcher-EXDevLauncher' from project 'Pods')
+	Building workspace UnitDirectory with scheme UnitDirectory and configuration Debug
+(2 failures)

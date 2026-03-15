@@ -7,6 +7,7 @@ import { prisma } from "./prisma.js";
 import { hashPassword, issueAuthTokens, revokeAllUserRefreshTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
 import { requireAuth, requireRole } from "./authMiddleware.js";
 import { decryptTemporaryPassword, encryptTemporaryPassword } from "./credentialsCrypto.js";
+import { registerPushToken, sendAnnouncementPush, unregisterPushToken } from "./pushNotifications.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -550,6 +551,40 @@ app.get("/api/users/issued-credentials/:id/reveal", requireAuth, requireRole("AD
   });
 }));
 
+app.post("/api/push/register", requireAuth, asyncHandler(async (req, res) => {
+  const token = (req.body?.token || "").toString().trim();
+  const platform = (req.body?.platform || "").toString().trim();
+
+  if (!token) {
+    res.status(400).json({ message: "token requis" });
+    return;
+  }
+
+  const result = await registerPushToken({
+    userId: req.auth.userId,
+    token,
+    platform
+  });
+
+  if (!result.ok) {
+    res.status(400).json({ message: "Token push invalide" });
+    return;
+  }
+
+  res.json({ ok: true });
+}));
+
+app.post("/api/push/unregister", requireAuth, asyncHandler(async (req, res) => {
+  const token = (req.body?.token || "").toString().trim();
+  if (!token) {
+    res.status(400).json({ message: "token requis" });
+    return;
+  }
+
+  await unregisterPushToken({ userId: req.auth.userId, token });
+  res.json({ ok: true });
+}));
+
 app.get("/api/announcements", requireAuth, asyncHandler(async (req, res) => {
   const isAdminLike = req.auth.role === "ADMIN" || req.auth.role === "MANAGER";
   const includeArchived = isAdminLike && req.query.includeArchived === "1";
@@ -669,6 +704,17 @@ app.post("/api/announcements", requireAuth, requireRole("ADMIN", "MANAGER"), asy
       entityId: created.id,
       actorId: req.auth.userId,
       details: { scope: created.scope, sectionId: created.sectionId, isUrgent: created.isUrgent, isPinned: created.isPinned }
+    }
+  });
+
+  const pushResult = await sendAnnouncementPush({ announcement: created });
+  await prisma.auditLog.create({
+    data: {
+      action: "SEND_ANNOUNCEMENT_PUSH",
+      entity: "Announcement",
+      entityId: created.id,
+      actorId: req.auth.userId,
+      details: pushResult
     }
   });
 
