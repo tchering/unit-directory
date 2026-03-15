@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { fetchJson, postJson } from "../api";
 import { colors } from "../theme";
 import { useAuth } from "../AuthContext";
@@ -20,8 +21,10 @@ export default function AddSoldierScreen({ navigation }) {
   const [rank, setRank] = useState("");
   const [photo, setPhoto] = useState("https://i.pravatar.cc/480?img=60");
   const [commandCategory, setCommandCategory] = useState("MILITAIRE_DU_RANG");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatedCredentials, setGeneratedCredentials] = useState(null);
 
   useEffect(() => {
     if (!isAdminLike) {
@@ -58,15 +61,26 @@ export default function AddSoldierScreen({ navigation }) {
     setError("");
 
     try {
-      const created = await postJson("/soldiers", {
+      const created = await postJson("/users/soldier-account", {
         name,
         fullName,
         rank,
         sectionId,
         photo,
-        commandCategory
+        commandCategory,
+        email: email.trim() ? email.trim().toLowerCase() : null
       });
-      navigation.replace("Soldier", { soldierId: created.id });
+      setGeneratedCredentials({
+        soldierId: created.soldierId,
+        username: created.username,
+        temporaryPassword: created.temporaryPassword
+      });
+      setName("");
+      setFullName("");
+      setRank("");
+      setEmail("");
+      setPhoto("https://i.pravatar.cc/480?img=60");
+      setCommandCategory("MILITAIRE_DU_RANG");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -74,11 +88,30 @@ export default function AddSoldierScreen({ navigation }) {
     }
   }
 
+  async function copyCredentials() {
+    if (!generatedCredentials) {
+      return;
+    }
+    await Clipboard.setStringAsync(
+      `Identifiant: ${generatedCredentials.username}\nMot de passe temporaire: ${generatedCredentials.temporaryPassword}`
+    );
+    Alert.alert("Copié", "Identifiants copiés dans le presse-papiers.");
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <TextInput style={styles.input} placeholder="Nom affiché (ex: Soldat Paul Durand)" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
       <TextInput style={styles.input} placeholder="Nom complet" placeholderTextColor={colors.muted} value={fullName} onChangeText={setFullName} />
       <TextInput style={styles.input} placeholder="Grade" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
+      <TextInput
+        style={styles.input}
+        placeholder="Email (optionnel)"
+        placeholderTextColor={colors.muted}
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
       <TextInput style={styles.input} placeholder="URL photo" placeholderTextColor={colors.muted} value={photo} onChangeText={setPhoto} autoCapitalize="none" />
 
       <Text style={styles.label}>Catégorie de commandement</Text>
@@ -110,8 +143,39 @@ export default function AddSoldierScreen({ navigation }) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable style={[styles.submit, (!canSubmit || saving) && styles.submitDisabled]} onPress={handleCreate}>
-        <Text style={styles.submitText}>{saving ? "Enregistrement..." : "Créer le militaire"}</Text>
+        <Text style={styles.submitText}>{saving ? "Création..." : "Créer compte soldat"}</Text>
       </Pressable>
+
+      <Modal visible={Boolean(generatedCredentials)} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Identifiants générés</Text>
+            <Text style={styles.modalText}>Ces identifiants ne seront plus affichés après fermeture.</Text>
+            <Text style={styles.credentialLine}>Identifiant: {generatedCredentials?.username}</Text>
+            <Text style={styles.credentialLine}>Mot de passe: {generatedCredentials?.temporaryPassword}</Text>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.secondaryBtn} onPress={copyCredentials}>
+                <Text style={styles.secondaryBtnText}>Copier</Text>
+              </Pressable>
+              <Pressable style={styles.submit} onPress={() => setGeneratedCredentials(null)}>
+                <Text style={styles.submitText}>Fermer</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  const soldierId = generatedCredentials?.soldierId;
+                  setGeneratedCredentials(null);
+                  if (soldierId) {
+                    navigation.replace("Soldier", { soldierId });
+                  }
+                }}
+              >
+                <Text style={styles.secondaryBtnText}>Voir profil</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -179,5 +243,48 @@ const styles = StyleSheet.create({
   submitText: {
     color: "#1b260f",
     fontWeight: "800"
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    padding: 18
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 14
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  modalText: {
+    color: colors.muted,
+    marginTop: 6
+  },
+  credentialLine: {
+    color: colors.text,
+    marginTop: 10,
+    fontWeight: "700"
+  },
+  modalActions: {
+    marginTop: 14,
+    gap: 8
+  },
+  secondaryBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center"
+  },
+  secondaryBtnText: {
+    color: colors.text,
+    fontWeight: "700"
   }
 });

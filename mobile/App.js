@@ -9,7 +9,7 @@ import SoldierProfileScreen from "./src/screens/SoldierProfileScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import AddSoldierScreen from "./src/screens/AddSoldierScreen";
 import LoginScreen from "./src/screens/LoginScreen";
-import RegisterScreen from "./src/screens/RegisterScreen";
+import ChangePasswordScreen from "./src/screens/ChangePasswordScreen";
 import AdminUsersScreen from "./src/screens/AdminUsersScreen";
 import { colors } from "./src/theme";
 import { clearSession, loadSession, saveSession } from "./src/authStorage";
@@ -46,21 +46,26 @@ export default function App() {
       .finally(() => setLoading(false));
   }, []);
 
+  const requiresPasswordChange = Boolean(session?.user?.mustChangePassword);
+
   const authValue = useMemo(() => ({
     session,
     isAdminLike: session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER",
-    async signIn(email, password) {
-      const next = await postJson("/auth/login", { email, password });
+    async signIn(identifier, password) {
+      const next = await postJson("/auth/login", { identifier, password });
       setSession(next);
       setAccessToken(next.accessToken);
       await saveSession(next);
     },
-    async register(email, password, passwordConfirm) {
-      await postJson("/auth/register", {
-        email,
-        password,
+    async completeFirstLoginPasswordChange(currentPassword, newPassword, passwordConfirm) {
+      const next = await postJson("/auth/change-password-first-login", {
+        currentPassword,
+        newPassword,
         passwordConfirm
       });
+      setSession(next);
+      setAccessToken(next.accessToken);
+      await saveSession(next);
     },
     async signOut() {
       try {
@@ -106,8 +111,10 @@ export default function App() {
         ...session,
         user: {
           id: me.id,
+          username: me.username,
           email: me.email,
-          role: me.role
+          role: me.role,
+          mustChangePassword: me.mustChangePassword
         }
       };
       setSession(next);
@@ -139,8 +146,20 @@ export default function App() {
           {!session ? (
             <>
               <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
             </>
+          ) : requiresPasswordChange ? (
+            <Stack.Screen
+              name="ChangePassword"
+              component={ChangePasswordScreen}
+              options={{
+                title: "Changer le mot de passe",
+                headerRight: () => (
+                  <Pressable onPress={authValue.signOut}>
+                    <Text style={{ color: colors.accent, fontWeight: "700" }}>Déconnexion</Text>
+                  </Pressable>
+                )
+              }}
+            />
           ) : (
             <>
               <Stack.Screen

@@ -26,7 +26,7 @@ function hashRefreshToken(token) {
 
 function buildAccessToken(user) {
   return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email },
+    { sub: user.id, role: user.role, username: user.username },
     ACCESS_TOKEN_SECRET,
     { expiresIn: ACCESS_TOKEN_TTL }
   );
@@ -53,8 +53,10 @@ export async function issueAuthTokens(user) {
     refreshToken: await storeRefreshToken(user.id),
     user: {
       id: user.id,
+      username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      mustChangePassword: user.mustChangePassword
     }
   };
 }
@@ -89,6 +91,18 @@ export async function revokeRefreshToken(rawToken) {
   await prisma.refreshToken.update({
     where: { id: session.id },
     data: { revokedAt: new Date() }
+  });
+}
+
+export async function revokeAllUserRefreshTokens(userId) {
+  await prisma.refreshToken.updateMany({
+    where: {
+      userId,
+      revokedAt: null
+    },
+    data: {
+      revokedAt: new Date()
+    }
   });
 }
 

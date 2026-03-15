@@ -64,7 +64,8 @@ export default function AdminUsersScreen() {
         const isMe = user.id === session?.user?.id;
         return (
           <View key={user.id} style={styles.card}>
-            <Text style={styles.email}>{user.email}</Text>
+            <Text style={styles.email}>{user.username}</Text>
+            {user.email ? <Text style={styles.secondary}>Email: {user.email}</Text> : null}
             <Text style={styles.meta}>Rôle actuel: {ROLE_LABELS[user.role] || user.role}{isMe ? " (Vous)" : ""}</Text>
 
             <View style={styles.row}>
@@ -111,6 +112,10 @@ const styles = StyleSheet.create({
   email: {
     color: colors.text,
     fontWeight: "800"
+  },
+  secondary: {
+    color: colors.muted,
+    marginTop: 2
   },
   meta: {
     color: colors.muted,

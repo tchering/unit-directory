@@ -2,9 +2,9 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "./prisma.js";
-import { hashPassword, issueAuthTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
+import { hashPassword, issueAuthTokens, revokeAllUserRefreshTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
 import { requireAuth, requireRole } from "./authMiddleware.js";
 
 const app = express();
@@ -23,80 +23,70 @@ const authLimiter = rateLimit({
   legacyHeaders: false
 });
 
-app.post("/api/auth/register", authLimiter, asyncHandler(async (req, res) => {
-  const email = (req.body?.email || "").toString().trim().toLowerCase();
-  const password = (req.body?.password || "").toString();
-  const passwordConfirm = (req.body?.passwordConfirm || "").toString();
+function normalizeUsernamePart(value) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .replace(/\.{2,}/g, ".");
+}
 
-  if (!email || !password || !passwordConfirm) {
-    res.status(400).json({ message: "email, password et passwordConfirm sont requis" });
-    return;
-  }
+async function generateUniqueUsername(fullName) {
+  const raw = normalizeUsernamePart(fullName);
+  const tokens = raw.split(".").filter(Boolean);
+  const first = tokens[0] || "militaire";
+  const last = tokens[tokens.length - 1] || "unite";
+  const base = `${first}.${last}`.slice(0, 26) || "militaire.unite";
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.com$/.test(email);
-  if (!emailValid) {
-    res.status(400).json({ message: "L'email doit se terminer par .com" });
-    return;
-  }
-
-  if (password.length < 10) {
-    res.status(400).json({ message: "Le mot de passe doit contenir au moins 10 caractères" });
-    return;
-  }
-
-  if (password !== passwordConfirm) {
-    res.status(400).json({ message: "Les mots de passe ne correspondent pas" });
-    return;
-  }
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    res.status(409).json({ message: "Cet utilisateur existe déjà" });
-    return;
-  }
-
-  const createdUser = await prisma.user.create({
-    data: {
-      email,
-      passwordHash: await hashPassword(password),
-      role: "VIEWER",
-      isActive: true
-    },
-    select: {
-      id: true,
-      email: true,
-      role: true
+  let candidate = base;
+  let suffix = 1;
+  while (true) {
+    const exists = await prisma.user.findUnique({
+      where: { username: candidate },
+      select: { id: true }
+    });
+    if (!exists) {
+      return candidate;
     }
-  });
+    suffix += 1;
+    candidate = `${base}${suffix}`.slice(0, 30);
+  }
+}
 
-  await prisma.auditLog.create({
-    data: {
-      action: "REGISTER",
-      entity: "User",
-      entityId: createdUser.id,
-      actorId: createdUser.id,
-      details: {
-        role: createdUser.role
-      }
-    }
-  });
+function generateTemporaryPassword() {
+  const raw = randomBytes(12).toString("base64url");
+  return `${raw}A1!`;
+}
 
-  res.status(201).json({
-    message: "Inscription réussie",
-    user: createdUser
-  });
-}));
+function isStrongPassword(password) {
+  return (
+    password.length >= 12
+    && /[A-Z]/.test(password)
+    && /[a-z]/.test(password)
+    && /[0-9]/.test(password)
+    && /[^A-Za-z0-9]/.test(password)
+  );
+}
 
 app.post("/api/auth/login", authLimiter, asyncHandler(async (req, res) => {
-  const email = (req.body?.email || "").toString().trim().toLowerCase();
+  const identifier = (req.body?.identifier || "").toString().trim().toLowerCase();
   const password = (req.body?.password || "").toString();
 
-  if (!email || !password) {
-    res.status(400).json({ message: "email et mot de passe sont requis" });
+  if (!identifier || !password) {
+    res.status(400).json({ message: "Identifiant et mot de passe sont requis" });
     return;
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { username: identifier },
+        { email: identifier }
+      ]
+    }
+  });
   if (!user || !user.isActive) {
     res.status(401).json({ message: "Identifiants invalides" });
     return;
@@ -109,6 +99,14 @@ app.post("/api/auth/login", authLimiter, asyncHandler(async (req, res) => {
   }
 
   const auth = await issueAuthTokens(user);
+  if (user.mustChangePassword) {
+    res.json({
+      ...auth,
+      code: "PASSWORD_CHANGE_REQUIRED",
+      passwordChangeRequired: true
+    });
+    return;
+  }
   res.json(auth);
 }));
 
@@ -136,10 +134,83 @@ app.post("/api/auth/logout", authLimiter, asyncHandler(async (req, res) => {
   res.status(204).send();
 }));
 
+app.post("/api/auth/change-password-first-login", requireAuth, asyncHandler(async (req, res) => {
+  const currentPassword = (req.body?.currentPassword || "").toString();
+  const newPassword = (req.body?.newPassword || "").toString();
+  const passwordConfirm = (req.body?.passwordConfirm || "").toString();
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.auth.userId }
+  });
+
+  if (!user || !user.isActive) {
+    res.status(401).json({ message: "Non autorisé" });
+    return;
+  }
+
+  if (!user.mustChangePassword) {
+    res.status(400).json({ message: "Le changement initial n'est pas requis" });
+    return;
+  }
+
+  if (!currentPassword || !newPassword || !passwordConfirm) {
+    res.status(400).json({ message: "currentPassword, newPassword et passwordConfirm sont requis" });
+    return;
+  }
+
+  const ok = await verifyPassword(currentPassword, user.passwordHash);
+  if (!ok) {
+    res.status(401).json({ message: "Mot de passe actuel invalide" });
+    return;
+  }
+
+  if (newPassword !== passwordConfirm) {
+    res.status(400).json({ message: "Les mots de passe ne correspondent pas" });
+    return;
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    res.status(400).json({
+      message: "Le mot de passe doit contenir 12+ caractères avec majuscule, minuscule, chiffre et caractère spécial"
+    });
+    return;
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await hashPassword(newPassword),
+      mustChangePassword: false
+    }
+  });
+
+  await revokeAllUserRefreshTokens(user.id);
+
+  await prisma.auditLog.create({
+    data: {
+      action: "PASSWORD_CHANGE_FIRST_LOGIN",
+      entity: "User",
+      entityId: user.id,
+      actorId: user.id,
+      details: { username: user.username }
+    }
+  });
+
+  const auth = await issueAuthTokens(updatedUser);
+  res.json(auth);
+}));
+
 app.get("/api/auth/me", requireAuth, asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.auth.userId },
-    select: { id: true, email: true, role: true, isActive: true }
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      role: true,
+      isActive: true,
+      mustChangePassword: true
+    }
   });
 
   if (!user || !user.isActive) {
@@ -279,7 +350,13 @@ app.get("/api/soldiers/:id", asyncHandler(async (req, res) => {
 }));
 
 app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
-  const { name, fullName, rank, photo, sectionId, commandCategory } = req.body || {};
+  res.status(410).json({
+    message: "Endpoint déprécié. Utiliser /api/users/soldier-account pour créer un militaire avec compte de connexion."
+  });
+}));
+
+app.post("/api/users/soldier-account", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const { name, fullName, rank, photo, sectionId, commandCategory, email } = req.body || {};
   const validCategories = ["CHEF_DE_SECTION", "SOUS_OFFICIER_ADJOINT", "SERGENT", "MILITAIRE_DU_RANG"];
 
   if (!name || !fullName || !rank || !photo || !sectionId) {
@@ -298,40 +375,56 @@ app.post("/api/soldiers", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHan
     return;
   }
 
-  const created = await prisma.soldier.create({
-    data: {
-      id: `s-${randomUUID().slice(0, 8)}`,
-      name: String(name).trim(),
-      fullName: String(fullName).trim(),
-      rank: String(rank).trim(),
-      photo: String(photo).trim(),
-      commandCategory: commandCategory || "MILITAIRE_DU_RANG",
-      sectionId,
-      createdById: req.auth.userId
-    }
-  });
+  const username = await generateUniqueUsername(String(fullName));
+  const temporaryPassword = generateTemporaryPassword();
 
-  await prisma.auditLog.create({
-    data: {
-      action: "CREATE",
-      entity: "Soldier",
-      entityId: created.id,
-      actorId: req.auth.userId,
-      details: {
-        sectionId
+  const created = await prisma.$transaction(async (tx) => {
+    const soldier = await tx.soldier.create({
+      data: {
+        id: `s-${randomUUID().slice(0, 8)}`,
+        name: String(name).trim(),
+        fullName: String(fullName).trim(),
+        rank: String(rank).trim(),
+        photo: String(photo).trim(),
+        commandCategory: commandCategory || "MILITAIRE_DU_RANG",
+        sectionId,
+        createdById: req.auth.userId
       }
-    }
+    });
+
+    const user = await tx.user.create({
+      data: {
+        username,
+        email: email ? String(email).trim().toLowerCase() : null,
+        passwordHash: await hashPassword(temporaryPassword),
+        role: "VIEWER",
+        mustChangePassword: true,
+        isActive: true
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: "CREATE_SOLDIER_ACCOUNT",
+        entity: "User",
+        entityId: user.id,
+        actorId: req.auth.userId,
+        details: {
+          username: user.username,
+          soldierId: soldier.id,
+          sectionId: soldier.sectionId,
+          commandCategory: soldier.commandCategory
+        }
+      }
+    });
+
+    return { soldier, user };
   });
 
   res.status(201).json({
-    id: created.id,
-    name: created.name,
-    fullName: created.fullName,
-    rank: created.rank,
-    photo: created.photo,
-    commandCategory: created.commandCategory,
-    sectionId: created.sectionId,
-    section: section.name
+    soldierId: created.soldier.id,
+    username: created.user.username,
+    temporaryPassword
   });
 }));
 
@@ -398,7 +491,6 @@ app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asy
     name: updated.name,
     fullName: updated.fullName,
     rank: updated.rank,
-    role: updated.role,
     photo: updated.photo,
     commandCategory: updated.commandCategory,
     sectionId: updated.sectionId,
@@ -440,9 +532,11 @@ app.get("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(asyn
   const users = await prisma.user.findMany({
     select: {
       id: true,
+      username: true,
       email: true,
       role: true,
       isActive: true,
+      mustChangePassword: true,
       createdAt: true
     },
     orderBy: { createdAt: "asc" }
@@ -452,32 +546,41 @@ app.get("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(asyn
 }));
 
 app.post("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(async (req, res) => {
+  const username = (req.body?.username || "").toString().trim().toLowerCase();
   const email = (req.body?.email || "").toString().trim().toLowerCase();
   const password = (req.body?.password || "").toString();
   const role = (req.body?.role || "VIEWER").toString().toUpperCase();
+  const mustChangePassword = req.body?.mustChangePassword !== false;
 
-  if (!email || !password || !["ADMIN", "MANAGER", "VIEWER"].includes(role)) {
-    res.status(400).json({ message: "email, mot de passe et rôle valide sont requis" });
+  if (!username || !password || !["ADMIN", "MANAGER", "VIEWER"].includes(role)) {
+    res.status(400).json({ message: "username, mot de passe et rôle valide sont requis" });
     return;
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
+  const [existingUsername, existingEmail] = await Promise.all([
+    prisma.user.findUnique({ where: { username } }),
+    email ? prisma.user.findUnique({ where: { email } }) : Promise.resolve(null)
+  ]);
+  if (existingUsername || existingEmail) {
     res.status(409).json({ message: "Cet utilisateur existe déjà" });
     return;
   }
 
   const createdUser = await prisma.user.create({
     data: {
-      email,
+      username,
+      email: email || null,
       passwordHash: await hashPassword(password),
-      role
+      role,
+      mustChangePassword
     },
     select: {
       id: true,
+      username: true,
       email: true,
       role: true,
-      isActive: true
+      isActive: true,
+      mustChangePassword: true
     }
   });
 
@@ -487,7 +590,7 @@ app.post("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(asy
       entity: "User",
       entityId: createdUser.id,
       actorId: req.auth.userId,
-      details: { role: createdUser.role, email: createdUser.email }
+      details: { role: createdUser.role, username: createdUser.username, email: createdUser.email }
     }
   });
 
@@ -497,9 +600,10 @@ app.post("/api/admin/users", requireAuth, requireRole("ADMIN"), asyncHandler(asy
 app.patch("/api/admin/users/:id", requireAuth, requireRole("ADMIN"), asyncHandler(async (req, res) => {
   const role = req.body?.role ? req.body.role.toString().toUpperCase() : undefined;
   const isActive = typeof req.body?.isActive === "boolean" ? req.body.isActive : undefined;
+  const mustChangePassword = typeof req.body?.mustChangePassword === "boolean" ? req.body.mustChangePassword : undefined;
 
-  if (!role && typeof isActive !== "boolean") {
-    res.status(400).json({ message: "Fournir role et/ou isActive" });
+  if (!role && typeof isActive !== "boolean" && typeof mustChangePassword !== "boolean") {
+    res.status(400).json({ message: "Fournir role et/ou isActive et/ou mustChangePassword" });
     return;
   }
 
@@ -535,9 +639,10 @@ app.patch("/api/admin/users/:id", requireAuth, requireRole("ADMIN"), asyncHandle
     where: { id: req.params.id },
     data: {
       ...(role ? { role } : {}),
-      ...(typeof isActive === "boolean" ? { isActive } : {})
+      ...(typeof isActive === "boolean" ? { isActive } : {}),
+      ...(typeof mustChangePassword === "boolean" ? { mustChangePassword } : {})
     },
-    select: { id: true, email: true, role: true, isActive: true }
+    select: { id: true, username: true, email: true, role: true, isActive: true, mustChangePassword: true }
   });
 
   await prisma.auditLog.create({
@@ -548,7 +653,8 @@ app.patch("/api/admin/users/:id", requireAuth, requireRole("ADMIN"), asyncHandle
       actorId: req.auth.userId,
       details: {
         role: updated.role,
-        isActive: updated.isActive
+        isActive: updated.isActive,
+        mustChangePassword: updated.mustChangePassword
       }
     }
   });

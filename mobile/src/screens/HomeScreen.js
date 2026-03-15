@@ -41,15 +41,19 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.panel}>
-        <Text style={styles.eyebrow}>Régiment</Text>
-        <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
-        <Image source={REGIMENT_LOGO} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.company}>{unit?.company || ""}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.eyebrow}>Régiment</Text>
+            <Text style={styles.regiment}>{unit?.regiment || "Chargement..."}</Text>
+            <Text style={styles.company}>{unit?.company || ""}</Text>
+          </View>
+          <Image source={REGIMENT_LOGO} style={styles.logo} resizeMode="contain" />
+        </View>
       </View>
 
       <View style={styles.userPanel}>
         <Text style={styles.userLabel}>Connecté en tant que</Text>
-        <Text style={styles.userValue}>{session?.user?.email || "Inconnu"}</Text>
+        <Text style={styles.userValue}>{session?.user?.username || session?.user?.email || "Inconnu"}</Text>
         <Text style={styles.userRole}>Rôle: {ROLE_LABELS[session?.user?.role] || session?.user?.role}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -97,6 +101,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  headerTextWrap: {
+    flex: 1
+  },
   eyebrow: {
     color: colors.accent,
     fontSize: 12,
@@ -110,14 +123,12 @@ const styles = StyleSheet.create({
     marginTop: 6
   },
   logo: {
-    width: 110,
-    height: 150,
-    marginTop: 10,
-    alignSelf: "center"
+    width: 86,
+    height: 116
   },
   company: {
     color: colors.muted,
-    marginTop: 2,
+    marginTop: 6,
     fontSize: 16
   },
   userPanel: {

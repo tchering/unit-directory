@@ -45,19 +45,22 @@ async function main() {
   });
 
   const adminEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const adminUsername = (process.env.ADMIN_USERNAME || "").trim().toLowerCase();
   const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
 
-  if (adminEmail && adminPassword) {
+  if (adminUsername && adminPassword) {
     await prisma.user.create({
       data: {
-        email: adminEmail,
+        username: adminUsername,
+        email: adminEmail || null,
         passwordHash: await hashPassword(adminPassword),
         role: "ADMIN",
-        isActive: true
+        isActive: true,
+        mustChangePassword: false
       }
     });
   } else {
-    console.warn("[SEED] ADMIN_EMAIL / ADMIN_PASSWORD not set. No admin user created.");
+    console.warn("[SEED] ADMIN_USERNAME / ADMIN_PASSWORD not set. No admin user created.");
   }
 }
 

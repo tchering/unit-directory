@@ -1,69 +1,64 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors } from "../theme";
 import { useAuth } from "../AuthContext";
+import { colors } from "../theme";
 
-export default function RegisterScreen({ navigation }) {
-  const { register } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function ChangePasswordScreen() {
+  const { completeFirstLoginPasswordChange } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
 
   async function submit() {
-    if (!email.trim() || !password || !passwordConfirm) {
-      setError("Email, mot de passe et confirmation requis.");
+    if (!currentPassword || !newPassword || !passwordConfirm) {
+      setError("Tous les champs sont requis.");
+      return;
+    }
+    if (newPassword !== passwordConfirm) {
+      setError("Les nouveaux mots de passe ne correspondent pas.");
       return;
     }
 
-    if (password !== passwordConfirm) {
-      setError("Les mots de passe ne correspondent pas.");
-      return;
-    }
-
-    setLoading(true);
+    setSaving(true);
     setError("");
-    setSuccess("");
-
     try {
-      await register(email.trim(), password, passwordConfirm);
-      setSuccess("Inscription réussie. Connectez-vous.");
-      setTimeout(() => navigation.navigate("Login"), 600);
+      await completeFirstLoginPasswordChange(currentPassword, newPassword, passwordConfirm);
     } catch (err) {
-      setError(err.message || "Échec de l'inscription");
+      setError(err.message || "Impossible de changer le mot de passe");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
   return (
     <View style={styles.screen}>
       <View style={styles.panel}>
-        <Text style={styles.title}>Créer un compte</Text>
-        <Text style={styles.subtitle}>Les nouveaux comptes sont créés en rôle lecture seule (VIEWER).</Text>
+        <Text style={styles.title}>Sécurité requise</Text>
+        <Text style={styles.subtitle}>
+          Vous devez changer votre mot de passe temporaire avant d'accéder à l'application.
+        </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Mot de passe temporaire"
           placeholderTextColor={colors.muted}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe (10 caractères min)"
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
           secureTextEntry
         />
         <TextInput
           style={styles.input}
-          placeholder="Confirmer le mot de passe"
+          placeholder="Nouveau mot de passe"
+          placeholderTextColor={colors.muted}
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirmer le nouveau mot de passe"
           placeholderTextColor={colors.muted}
           value={passwordConfirm}
           onChangeText={setPasswordConfirm}
@@ -71,14 +66,9 @@ export default function RegisterScreen({ navigation }) {
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {success ? <Text style={styles.success}>{success}</Text> : null}
 
-        <Pressable style={[styles.button, loading && styles.buttonDisabled]} onPress={submit}>
-          <Text style={styles.buttonText}>{loading ? "Inscription..." : "S'inscrire"}</Text>
-        </Pressable>
-
-        <Pressable style={styles.linkButton} onPress={() => navigation.navigate("Login")}>
-          <Text style={styles.linkText}>Retour à la connexion</Text>
+        <Pressable style={[styles.button, saving && styles.buttonDisabled]} onPress={submit}>
+          <Text style={styles.buttonText}>{saving ? "Mise à jour..." : "Mettre à jour le mot de passe"}</Text>
         </Pressable>
       </View>
     </View>
@@ -123,10 +113,6 @@ const styles = StyleSheet.create({
     color: "#ff9191",
     marginBottom: 10
   },
-  success: {
-    color: "#9bdd9b",
-    marginBottom: 10
-  },
   button: {
     backgroundColor: colors.accent,
     borderRadius: 12,
@@ -139,13 +125,5 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#1b260f",
     fontWeight: "800"
-  },
-  linkButton: {
-    alignItems: "center",
-    marginTop: 12
-  },
-  linkText: {
-    color: colors.accent,
-    fontWeight: "700"
   }
 });

@@ -3,16 +3,16 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors } from "../theme";
 import { useAuth } from "../AuthContext";
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit() {
-    if (!email.trim() || !password) {
-      setError("Email et mot de passe requis.");
+    if (!identifier.trim() || !password) {
+      setError("Identifiant et mot de passe requis.");
       return;
     }
 
@@ -20,7 +20,7 @@ export default function LoginScreen({ navigation }) {
     setError("");
 
     try {
-      await signIn(email.trim(), password);
+      await signIn(identifier.trim(), password);
     } catch (err) {
       setError(err.message || "Échec de connexion");
     } finally {
@@ -35,12 +35,11 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.subtitle}>Accès réservé au personnel autorisé</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Identifiant militaire"
           placeholderTextColor={colors.muted}
-          value={email}
-          onChangeText={setEmail}
+          value={identifier}
+          onChangeText={setIdentifier}
           autoCapitalize="none"
-          keyboardType="email-address"
         />
         <TextInput
           style={styles.input}
@@ -57,9 +56,6 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.buttonText}>{loading ? "Connexion..." : "Se connecter"}</Text>
         </Pressable>
 
-        <Pressable style={styles.linkButton} onPress={() => navigation.navigate("Register")}>
-          <Text style={styles.linkText}>Créer un compte</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -116,12 +112,4 @@ const styles = StyleSheet.create({
     color: "#1b260f",
     fontWeight: "800"
   },
-  linkButton: {
-    alignItems: "center",
-    marginTop: 12
-  },
-  linkText: {
-    color: colors.accent,
-    fontWeight: "700"
-  }
 });

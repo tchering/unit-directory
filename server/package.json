@@ -12,7 +12,8 @@
     "db:seed": "node prisma/seed.js",
     "db:setup": "npm run db:push && npm run db:seed",
     "admin:create": "node scripts/create-admin.js",
-    "db:backfill-category": "node scripts/backfill-command-category.js"
+    "db:backfill-category": "node scripts/backfill-command-category.js",
+    "db:backfill-usernames": "node scripts/backfill-usernames.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
