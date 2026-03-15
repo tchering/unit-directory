@@ -491,12 +491,63 @@ app.get("/api/users/issued-credentials", requireAuth, requireRole("ADMIN", "MANA
     soldierName: row.soldier.fullName || row.soldier.name,
     rank: row.soldier.rank,
     username: row.usernameSnapshot,
-    temporaryPassword: row.passwordChangedAt ? null : decryptTemporaryPassword(row.encryptedTempPassword),
     createdAt: row.createdAt,
     createdBy: row.createdBy.username || row.createdBy.id,
     passwordChangedAt: row.passwordChangedAt,
+    canRevealTemporaryPassword: !row.passwordChangedAt,
     status: row.passwordChangedAt ? "PASSWORD_CHANGED" : "TEMP_PASSWORD_ACTIVE"
   })));
+}));
+
+app.get("/api/users/issued-credentials/:id/reveal", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const row = await prisma.issuedCredential.findUnique({
+    where: { id: req.params.id },
+    include: {
+      soldier: {
+        select: { fullName: true, name: true }
+      }
+    }
+  });
+
+  if (!row) {
+    res.status(404).json({ message: "Identifiant émis introuvable" });
+    return;
+  }
+
+  if (row.passwordChangedAt) {
+    res.status(400).json({ message: "Le mot de passe temporaire n'est plus disponible" });
+    return;
+  }
+
+  const temporaryPassword = decryptTemporaryPassword(row.encryptedTempPassword);
+  if (!temporaryPassword) {
+    res.status(500).json({ message: "Impossible de déchiffrer le mot de passe temporaire" });
+    return;
+  }
+
+  await prisma.issuedCredential.update({
+    where: { id: row.id },
+    data: { lastViewedAt: new Date() }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "REVEAL_TEMP_PASSWORD",
+      entity: "IssuedCredential",
+      entityId: row.id,
+      actorId: req.auth.userId,
+      details: {
+        soldierName: row.soldier.fullName || row.soldier.name,
+        username: row.usernameSnapshot
+      }
+    }
+  });
+
+  res.json({
+    id: row.id,
+    username: row.usernameSnapshot,
+    temporaryPassword
+  });
 }));
 
 app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {

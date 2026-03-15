@@ -16,6 +16,7 @@ export default function IssuedCredentialsScreen() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [revealed, setRevealed] = useState({});
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -37,11 +38,21 @@ export default function IssuedCredentialsScreen() {
   );
 
   async function copyCredential(item) {
-    if (!item?.temporaryPassword) {
+    const password = revealed[item.id];
+    if (!password) {
       return;
     }
-    await Clipboard.setStringAsync(`Identifiant: ${item.username}\nMot de passe temporaire: ${item.temporaryPassword}`);
+    await Clipboard.setStringAsync(`Identifiant: ${item.username}\nMot de passe temporaire: ${password}`);
     Alert.alert("Copié", "Identifiants copiés dans le presse-papiers.");
+  }
+
+  async function revealCredential(item) {
+    try {
+      const data = await fetchJson(`/users/issued-credentials/${item.id}/reveal`);
+      setRevealed((prev) => ({ ...prev, [item.id]: data.temporaryPassword }));
+    } catch (err) {
+      Alert.alert("Erreur", err.message || "Impossible de révéler le mot de passe");
+    }
   }
 
   if (loading) {
@@ -69,7 +80,12 @@ export default function IssuedCredentialsScreen() {
             <Text style={styles.changed}>Mot de passe changé le {formatDate(item.passwordChangedAt)}</Text>
           ) : (
             <>
-              <Text style={styles.tempPassword}>Mot de passe temporaire: {item.temporaryPassword || "Indisponible"}</Text>
+              <Text style={styles.tempPassword}>
+                Mot de passe temporaire: {revealed[item.id] ? revealed[item.id] : "Masqué"}
+              </Text>
+              <Pressable style={styles.revealBtn} onPress={() => revealCredential(item)}>
+                <Text style={styles.revealBtnText}>{revealed[item.id] ? "Révéler à nouveau" : "Révéler"}</Text>
+              </Pressable>
               <Pressable style={styles.copyBtn} onPress={() => copyCredential(item)}>
                 <Text style={styles.copyBtnText}>Copier les identifiants</Text>
               </Pressable>
@@ -128,6 +144,19 @@ const styles = StyleSheet.create({
   changed: {
     color: "#9bdd9b",
     marginTop: 8,
+    fontWeight: "700"
+  },
+  revealBtn: {
+    marginTop: 10,
+    backgroundColor: "#1f2f2f",
+    borderWidth: 1,
+    borderColor: "#365252",
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center"
+  },
+  revealBtnText: {
+    color: "#d4ebeb",
     fontWeight: "700"
   },
   copyBtn: {
