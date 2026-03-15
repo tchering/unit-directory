@@ -550,6 +550,251 @@ app.get("/api/users/issued-credentials/:id/reveal", requireAuth, requireRole("AD
   });
 }));
 
+app.get("/api/announcements", requireAuth, asyncHandler(async (req, res) => {
+  const isAdminLike = req.auth.role === "ADMIN" || req.auth.role === "MANAGER";
+  const includeArchived = isAdminLike && req.query.includeArchived === "1";
+  const sectionIdQuery = (req.query.sectionId || "").toString().trim();
+  const now = new Date();
+
+  const where = {
+    ...(includeArchived ? {} : { isArchived: false }),
+    OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+    ...(sectionIdQuery ? { sectionId: sectionIdQuery } : {})
+  };
+
+  const rows = await prisma.announcement.findMany({
+    where,
+    include: {
+      section: { select: { id: true, name: true } },
+      createdBy: { select: { id: true, username: true } },
+      reads: {
+        where: { userId: req.auth.userId },
+        select: { id: true }
+      }
+    },
+    orderBy: [
+      { isPinned: "desc" },
+      { isUrgent: "desc" },
+      { createdAt: "desc" }
+    ]
+  });
+
+  const unreadCount = await prisma.announcement.count({
+    where: {
+      isArchived: false,
+      OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+      NOT: { createdById: req.auth.userId },
+      reads: {
+        none: { userId: req.auth.userId }
+      }
+    }
+  });
+
+  res.json({
+    unreadCount,
+    items: rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      scope: row.scope,
+      sectionId: row.sectionId,
+      sectionName: row.section?.name || null,
+      isPinned: row.isPinned,
+      isUrgent: row.isUrgent,
+      isArchived: row.isArchived,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      createdById: row.createdById,
+      createdBy: row.createdBy.username || row.createdBy.id,
+      isRead: row.reads.length > 0
+    }))
+  });
+}));
+
+app.post("/api/announcements", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const title = (req.body?.title || "").toString().trim();
+  const body = (req.body?.body || "").toString().trim();
+  const scope = (req.body?.scope || "COMPANY").toString().toUpperCase();
+  const sectionId = req.body?.sectionId ? String(req.body.sectionId) : null;
+  const isPinned = Boolean(req.body?.isPinned);
+  const isUrgent = Boolean(req.body?.isUrgent);
+  const expiresAtRaw = req.body?.expiresAt;
+
+  if (!title || !body) {
+    res.status(400).json({ message: "title et body sont requis" });
+    return;
+  }
+  if (!["REGIMENT", "COMPANY", "SECTION"].includes(scope)) {
+    res.status(400).json({ message: "scope invalide" });
+    return;
+  }
+
+  let section = null;
+  if (scope === "SECTION") {
+    if (!sectionId) {
+      res.status(400).json({ message: "sectionId est requis pour scope SECTION" });
+      return;
+    }
+    section = await prisma.section.findUnique({ where: { id: sectionId } });
+    if (!section) {
+      res.status(400).json({ message: "sectionId invalide" });
+      return;
+    }
+  }
+
+  const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
+  if (expiresAtRaw && Number.isNaN(expiresAt.getTime())) {
+    res.status(400).json({ message: "expiresAt invalide" });
+    return;
+  }
+
+  const created = await prisma.announcement.create({
+    data: {
+      title,
+      body,
+      scope,
+      sectionId: scope === "SECTION" ? sectionId : null,
+      isPinned,
+      isUrgent,
+      expiresAt,
+      createdById: req.auth.userId
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "CREATE_ANNOUNCEMENT",
+      entity: "Announcement",
+      entityId: created.id,
+      actorId: req.auth.userId,
+      details: { scope: created.scope, sectionId: created.sectionId, isUrgent: created.isUrgent, isPinned: created.isPinned }
+    }
+  });
+
+  res.status(201).json(created);
+}));
+
+app.patch("/api/announcements/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
+  const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    res.status(404).json({ message: "Annonce introuvable" });
+    return;
+  }
+
+  const nextScope = req.body?.scope ? String(req.body.scope).toUpperCase() : existing.scope;
+  if (!["REGIMENT", "COMPANY", "SECTION"].includes(nextScope)) {
+    res.status(400).json({ message: "scope invalide" });
+    return;
+  }
+
+  const requestedSectionId = req.body?.sectionId !== undefined ? req.body.sectionId : existing.sectionId;
+  let nextSectionId = requestedSectionId ? String(requestedSectionId) : null;
+  if (nextScope === "SECTION") {
+    if (!nextSectionId) {
+      res.status(400).json({ message: "sectionId est requis pour scope SECTION" });
+      return;
+    }
+    const section = await prisma.section.findUnique({ where: { id: nextSectionId } });
+    if (!section) {
+      res.status(400).json({ message: "sectionId invalide" });
+      return;
+    }
+  } else {
+    nextSectionId = null;
+  }
+
+  const data = {
+    ...(req.body?.title !== undefined ? { title: String(req.body.title).trim() } : {}),
+    ...(req.body?.body !== undefined ? { body: String(req.body.body).trim() } : {}),
+    ...(req.body?.isPinned !== undefined ? { isPinned: Boolean(req.body.isPinned) } : {}),
+    ...(req.body?.isUrgent !== undefined ? { isUrgent: Boolean(req.body.isUrgent) } : {}),
+    ...(req.body?.isArchived !== undefined ? { isArchived: Boolean(req.body.isArchived) } : {}),
+    scope: nextScope,
+    sectionId: nextSectionId
+  };
+
+  if (req.body?.expiresAt !== undefined) {
+    if (req.body.expiresAt === null || req.body.expiresAt === "") {
+      data.expiresAt = null;
+    } else {
+      const parsed = new Date(req.body.expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        res.status(400).json({ message: "expiresAt invalide" });
+        return;
+      }
+      data.expiresAt = parsed;
+    }
+  }
+
+  if (data.title !== undefined && !data.title) {
+    res.status(400).json({ message: "title ne peut pas être vide" });
+    return;
+  }
+  if (data.body !== undefined && !data.body) {
+    res.status(400).json({ message: "body ne peut pas être vide" });
+    return;
+  }
+
+  const updated = await prisma.announcement.update({
+    where: { id: existing.id },
+    data
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE_ANNOUNCEMENT",
+      entity: "Announcement",
+      entityId: updated.id,
+      actorId: req.auth.userId,
+      details: {
+        before: {
+          title: existing.title,
+          scope: existing.scope,
+          sectionId: existing.sectionId,
+          isArchived: existing.isArchived
+        },
+        after: {
+          title: updated.title,
+          scope: updated.scope,
+          sectionId: updated.sectionId,
+          isArchived: updated.isArchived
+        }
+      }
+    }
+  });
+
+  res.json(updated);
+}));
+
+app.post("/api/announcements/:id/read", requireAuth, asyncHandler(async (req, res) => {
+  const announcement = await prisma.announcement.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, isArchived: true, expiresAt: true }
+  });
+
+  if (!announcement || announcement.isArchived || (announcement.expiresAt && announcement.expiresAt < new Date())) {
+    res.status(404).json({ message: "Annonce introuvable" });
+    return;
+  }
+
+  const read = await prisma.announcementRead.upsert({
+    where: {
+      announcementId_userId: {
+        announcementId: announcement.id,
+        userId: req.auth.userId
+      }
+    },
+    update: { readAt: new Date() },
+    create: {
+      announcementId: announcement.id,
+      userId: req.auth.userId
+    }
+  });
+
+  res.json({ ok: true, readAt: read.readAt });
+}));
+
 app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asyncHandler(async (req, res) => {
   const validCategories = ["CHEF_DE_SECTION", "SOUS_OFFICIER_ADJOINT", "SERGENT", "MILITAIRE_DU_RANG"];
   const sectionId = req.body?.sectionId ? String(req.body.sectionId) : undefined;

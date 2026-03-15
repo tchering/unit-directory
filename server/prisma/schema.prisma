@@ -29,6 +29,7 @@ model Section {
   companyId Int
   company   Company   @relation(fields: [companyId], references: [id])
   soldiers  Soldier[]
+  announcements Announcement[]
 
   @@index([companyId])
 }
@@ -65,6 +66,42 @@ model User {
   createdSoldiers Soldier[]    @relation("CreatedBy")
   createdCredentials IssuedCredential[] @relation("CredentialCreatedBy")
   issuedCredentials IssuedCredential[] @relation("CredentialForUser")
+  createdAnnouncements Announcement[] @relation("AnnouncementCreatedBy")
+  announcementReads AnnouncementRead[]
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  body        String
+  scope       VisibilityScope @default(COMPANY)
+  sectionId   String?
+  section     Section? @relation(fields: [sectionId], references: [id])
+  isPinned    Boolean  @default(false)
+  isUrgent    Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  expiresAt   DateTime?
+  createdById String
+  createdBy   User     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reads       AnnouncementRead[]
+
+  @@index([sectionId])
+  @@index([scope, isArchived, expiresAt])
+  @@index([createdAt])
+}
+
+model AnnouncementRead {
+  id             String   @id @default(uuid())
+  announcementId String
+  userId         String
+  readAt         DateTime @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([announcementId, userId])
+  @@index([userId, readAt])
 }
 
 model IssuedCredential {
@@ -124,4 +161,10 @@ enum CommandCategory {
   SOUS_OFFICIER_ADJOINT
   SERGENT
   MILITAIRE_DU_RANG
+}
+
+enum VisibilityScope {
+  REGIMENT
+  COMPANY
+  SECTION
 }

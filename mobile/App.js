@@ -12,6 +12,8 @@ import LoginScreen from "./src/screens/LoginScreen";
 import ChangePasswordScreen from "./src/screens/ChangePasswordScreen";
 import AdminUsersScreen from "./src/screens/AdminUsersScreen";
 import IssuedCredentialsScreen from "./src/screens/IssuedCredentialsScreen";
+import AnnouncementsScreen from "./src/screens/AnnouncementsScreen";
+import AnnouncementEditorScreen from "./src/screens/AnnouncementEditorScreen";
 import { colors } from "./src/theme";
 import { clearSession, loadSession, saveSession } from "./src/authStorage";
 import { fetchJson, postJson, setAccessToken, setTokenRefreshHandler } from "./src/api";
@@ -181,6 +183,8 @@ export default function App() {
               <Stack.Screen name="AddSoldier" component={AddSoldierScreen} options={{ title: "Ajouter un militaire" }} />
               <Stack.Screen name="IssuedCredentials" component={IssuedCredentialsScreen} options={{ title: "Identifiants créés" }} />
               <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: "Gérer les utilisateurs" }} />
+              <Stack.Screen name="Announcements" component={AnnouncementsScreen} options={{ title: "Annonces" }} />
+              <Stack.Screen name="AnnouncementEditor" component={AnnouncementEditorScreen} options={{ title: "Éditer une annonce" }} />
             </>
           )}
         </Stack.Navigator>

@@ -18,14 +18,16 @@ export default function HomeScreen({ navigation }) {
   const isAdminLike = isAdmin || session?.user?.role === "MANAGER";
   const [unit, setUnit] = useState(null);
   const [sections, setSections] = useState([]);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
   const [error, setError] = useState("");
 
   const loadHome = useCallback(() => {
     setError("");
-    Promise.all([fetchJson("/unit"), fetchJson("/sections")])
-      .then(([unitData, sectionData]) => {
+    Promise.all([fetchJson("/unit"), fetchJson("/sections"), fetchJson("/announcements")])
+      .then(([unitData, sectionData, announcementData]) => {
         setUnit(unitData);
         setSections(sectionData);
+        setAnnouncementUnreadCount(announcementData?.unreadCount || 0);
       })
       .catch((err) => {
         setError(err.message);
@@ -60,6 +62,14 @@ export default function HomeScreen({ navigation }) {
 
       <Pressable style={styles.searchButton} onPress={() => navigation.navigate("Search")}>
         <Text style={styles.searchButtonText}>Rechercher un militaire</Text>
+      </Pressable>
+      <Pressable style={styles.announcementButton} onPress={() => navigation.navigate("Announcements")}>
+        <Text style={styles.announcementButtonText}>Annonces</Text>
+        {announcementUnreadCount > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{announcementUnreadCount > 99 ? "99+" : announcementUnreadCount}</Text>
+          </View>
+        ) : null}
       </Pressable>
       {isAdminLike ? (
         <>
@@ -173,6 +183,36 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     color: "#19210f",
+    fontWeight: "800"
+  },
+  announcementButton: {
+    marginTop: 10,
+    backgroundColor: "#2b2f3a",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#444d65",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  announcementButtonText: {
+    color: "#dce6ff",
+    fontWeight: "700"
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: "#ce4038",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "800"
   },
   addButton: {

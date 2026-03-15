@@ -5,6 +5,8 @@ import { hashPassword } from "../src/auth.js";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.announcementRead.deleteMany();
+  await prisma.announcement.deleteMany();
   await prisma.soldier.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.refreshToken.deleteMany();
@@ -49,7 +51,7 @@ async function main() {
   const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
 
   if (adminUsername && adminPassword) {
-    await prisma.user.create({
+    const admin = await prisma.user.create({
       data: {
         username: adminUsername,
         email: adminEmail || null,
@@ -57,6 +59,16 @@ async function main() {
         role: "ADMIN",
         isActive: true,
         mustChangePassword: false
+      }
+    });
+
+    await prisma.announcement.create({
+      data: {
+        title: "Bienvenue sur Unit Directory",
+        body: "Les annonces de la compagnie apparaissent ici.",
+        scope: "COMPANY",
+        isPinned: true,
+        createdById: admin.id
       }
     });
   } else {
