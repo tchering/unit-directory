@@ -213,24 +213,121 @@ app.post("/api/auth/change-password-first-login", requireAuth, asyncHandler(asyn
 }));
 
 app.get("/api/auth/me", requireAuth, asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.auth.userId },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      role: true,
-      isActive: true,
-      mustChangePassword: true
-    }
-  });
+  const [user, credential] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: req.auth.userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        mustChangePassword: true
+      }
+    }),
+    prisma.issuedCredential.findFirst({
+      where: { userId: req.auth.userId },
+      select: { soldierId: true },
+      orderBy: { createdAt: "desc" }
+    })
+  ]);
 
   if (!user || !user.isActive) {
     res.status(401).json({ message: "Non autorisé" });
     return;
   }
 
-  res.json(user);
+  res.json({
+    ...user,
+    soldierId: credential?.soldierId || null
+  });
+}));
+
+async function resolveUserSoldierId(userId) {
+  const credential = await prisma.issuedCredential.findFirst({
+    where: { userId },
+    select: { soldierId: true },
+    orderBy: { createdAt: "desc" }
+  });
+  return credential?.soldierId || null;
+}
+
+app.patch("/api/soldiers/:id/position", requireAuth, asyncHandler(async (req, res) => {
+  const soldierId = String(req.params.id);
+  const currentPosition = (req.body?.currentPosition || "").toString().trim();
+  const availability = (req.body?.availability || "").toString().trim().toUpperCase();
+  const validAvailability = ["PRESENT", "ABSENT", "MISSION", "PERMISSION"];
+  const normalizedPosition = currentPosition || null;
+
+  if (currentPosition.length > 120) {
+    res.status(400).json({ message: "Position actuelle trop longue (120 caractères max)" });
+    return;
+  }
+  if (!validAvailability.includes(availability)) {
+    res.status(400).json({ message: "Statut de présence invalide" });
+    return;
+  }
+  if (availability !== "PRESENT" && !currentPosition) {
+    res.status(400).json({ message: "Position actuelle requise sauf si statut Présent" });
+    return;
+  }
+
+  const existing = await prisma.soldier.findUnique({
+    where: { id: soldierId },
+    include: { section: true }
+  });
+
+  if (!existing) {
+    res.status(404).json({ message: "Militaire introuvable" });
+    return;
+  }
+
+  const isAdminLike = req.auth.role === "ADMIN" || req.auth.role === "MANAGER";
+  if (!isAdminLike) {
+    const ownSoldierId = await resolveUserSoldierId(req.auth.userId);
+    if (!ownSoldierId || ownSoldierId !== soldierId) {
+      res.status(403).json({ message: "Accès interdit" });
+      return;
+    }
+  }
+
+  const updated = await prisma.soldier.update({
+    where: { id: soldierId },
+    data: {
+      currentPosition: availability === "PRESENT" ? null : normalizedPosition,
+      availability,
+      positionUpdatedAt: new Date(),
+      positionUpdatedById: req.auth.userId
+    },
+    include: { section: true }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE_POSITION",
+      entity: "Soldier",
+      entityId: updated.id,
+      actorId: req.auth.userId,
+      details: {
+        availability: updated.availability,
+        currentPosition: updated.currentPosition
+      }
+    }
+  });
+
+  res.json({
+    id: updated.id,
+    name: updated.name,
+    fullName: updated.fullName,
+    rank: updated.rank,
+    photo: updated.photo,
+    commandCategory: updated.commandCategory,
+    sectionId: updated.sectionId,
+    section: updated.section.name,
+    currentPosition: updated.currentPosition,
+    availability: updated.availability,
+    positionUpdatedAt: updated.positionUpdatedAt
+  });
 }));
 
 app.get("/api/unit", asyncHandler(async (_req, res) => {
@@ -333,7 +430,10 @@ app.get("/api/soldiers", asyncHandler(async (req, res) => {
       photo: soldier.photo,
       commandCategory: soldier.commandCategory,
       sectionId: soldier.sectionId,
-      section: soldier.section.name
+      section: soldier.section.name,
+      currentPosition: soldier.currentPosition,
+      availability: soldier.availability,
+      positionUpdatedAt: soldier.positionUpdatedAt
     }))
   );
 }));
@@ -357,7 +457,10 @@ app.get("/api/soldiers/:id", asyncHandler(async (req, res) => {
     photo: soldier.photo,
     commandCategory: soldier.commandCategory,
     sectionId: soldier.sectionId,
-    section: soldier.section.name
+    section: soldier.section.name,
+    currentPosition: soldier.currentPosition,
+    availability: soldier.availability,
+    positionUpdatedAt: soldier.positionUpdatedAt
   });
 }));
 
@@ -907,7 +1010,10 @@ app.patch("/api/soldiers/:id", requireAuth, requireRole("ADMIN", "MANAGER"), asy
     photo: updated.photo,
     commandCategory: updated.commandCategory,
     sectionId: updated.sectionId,
-    section: nextSection.name
+    section: nextSection.name,
+    currentPosition: updated.currentPosition,
+    availability: updated.availability,
+    positionUpdatedAt: updated.positionUpdatedAt
   });
 }));
 

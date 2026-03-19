@@ -41,6 +41,11 @@ model Soldier {
   rank      String
   photo     String
   commandCategory CommandCategory @default(MILITAIRE_DU_RANG)
+  currentPosition String?
+  availability SoldierAvailability @default(PRESENT)
+  positionUpdatedAt DateTime?
+  positionUpdatedById String?
+  positionUpdatedBy User? @relation("PositionUpdatedBy", fields: [positionUpdatedById], references: [id])
   sectionId String
   section   Section @relation(fields: [sectionId], references: [id])
   createdById String?
@@ -49,6 +54,7 @@ model Soldier {
 
   @@index([sectionId])
   @@index([createdById])
+  @@index([positionUpdatedById])
 }
 
 model User {
@@ -64,6 +70,7 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   createdSoldiers Soldier[]    @relation("CreatedBy")
+  updatedSoldierPositions Soldier[] @relation("PositionUpdatedBy")
   createdCredentials IssuedCredential[] @relation("CredentialCreatedBy")
   issuedCredentials IssuedCredential[] @relation("CredentialForUser")
   createdAnnouncements Announcement[] @relation("AnnouncementCreatedBy")
@@ -182,4 +189,11 @@ enum VisibilityScope {
   REGIMENT
   COMPANY
   SECTION
+}
+
+enum SoldierAvailability {
+  PRESENT
+  ABSENT
+  MISSION
+  PERMISSION
 }

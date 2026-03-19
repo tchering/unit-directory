@@ -48,6 +48,12 @@ async function storeRefreshToken(userId) {
 }
 
 export async function issueAuthTokens(user) {
+  const credential = await prisma.issuedCredential.findFirst({
+    where: { userId: user.id },
+    select: { soldierId: true },
+    orderBy: { createdAt: "desc" }
+  });
+
   return {
     accessToken: buildAccessToken(user),
     refreshToken: await storeRefreshToken(user.id),
@@ -56,7 +62,8 @@ export async function issueAuthTokens(user) {
       username: user.username,
       email: user.email,
       role: user.role,
-      mustChangePassword: user.mustChangePassword
+      mustChangePassword: user.mustChangePassword,
+      soldierId: credential?.soldierId || null
     }
   };
 }

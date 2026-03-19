@@ -8,6 +8,7 @@ async function main() {
   await prisma.devicePushToken.deleteMany();
   await prisma.announcementRead.deleteMany();
   await prisma.announcement.deleteMany();
+  await prisma.issuedCredential.deleteMany();
   await prisma.soldier.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.refreshToken.deleteMany();

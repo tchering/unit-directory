@@ -130,7 +130,8 @@ export default function App() {
           username: me.username,
           email: me.email,
           role: me.role,
-          mustChangePassword: me.mustChangePassword
+          mustChangePassword: me.mustChangePassword,
+          soldierId: me.soldierId || null
         }
       };
       setSession(next);
@@ -203,7 +204,7 @@ export default function App() {
                 name="Home"
                 component={HomeScreen}
                 options={{
-                  title: "15e Compagnie",
+                  title: "15eme CMLP",
                   headerRight: () => (
                     <Pressable onPress={authValue.signOut}>
                       <Text style={{ color: colors.accent, fontWeight: "700" }}>Déconnexion</Text>

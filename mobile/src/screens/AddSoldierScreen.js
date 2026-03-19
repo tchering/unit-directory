@@ -12,6 +12,12 @@ const CATEGORIES = [
   { value: "MILITAIRE_DU_RANG", label: "MDR" }
 ];
 
+const RANK_OPTIONS_BY_CATEGORY = {
+  MILITAIRE_DU_RANG: ["Soldat", "1er classe", "Cpl", "BCH", "CC1"],
+  CHEF_DE_SECTION: ["Ltn", "Maj", "Adc", "Adj", "MDL/C(BM2)", "MDL/C", "MDL"],
+  SOUS_OFFICIER_ADJOINT: ["Adj", "MDL/C(BM2)", "MDL/C", "MDL"]
+};
+
 export default function AddSoldierScreen({ navigation }) {
   const { isAdminLike } = useAuth();
   const [sections, setSections] = useState([]);
@@ -25,6 +31,7 @@ export default function AddSoldierScreen({ navigation }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
+  const [rankPickerVisible, setRankPickerVisible] = useState(false);
 
   useEffect(() => {
     if (!isAdminLike) {
@@ -47,6 +54,10 @@ export default function AddSoldierScreen({ navigation }) {
   const canSubmit = useMemo(() => {
     return name.trim() && fullName.trim() && rank.trim() && sectionId;
   }, [fullName, name, rank, sectionId]);
+
+  const rankOptions = useMemo(() => {
+    return RANK_OPTIONS_BY_CATEGORY[commandCategory] || [];
+  }, [commandCategory]);
 
   async function handleCreate() {
     if (!canSubmit || saving) {
@@ -102,7 +113,15 @@ export default function AddSoldierScreen({ navigation }) {
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <TextInput style={styles.input} placeholder="Nom affiché (ex: Soldat Paul Durand)" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
       <TextInput style={styles.input} placeholder="Nom complet" placeholderTextColor={colors.muted} value={fullName} onChangeText={setFullName} />
-      <TextInput style={styles.input} placeholder="Grade" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
+      {rankOptions.length > 0 ? (
+        <Pressable style={styles.input} onPress={() => setRankPickerVisible(true)}>
+          <Text style={rank ? styles.inputValueText : styles.inputPlaceholderText}>
+            {rank || "Choisir un grade"}
+          </Text>
+        </Pressable>
+      ) : (
+        <TextInput style={styles.input} placeholder="Grade" placeholderTextColor={colors.muted} value={rank} onChangeText={setRank} />
+      )}
       <TextInput
         style={styles.input}
         placeholder="Email (optionnel)"
@@ -176,6 +195,31 @@ export default function AddSoldierScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={rankPickerVisible} transparent animationType="fade" onRequestClose={() => setRankPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Choisir un grade</Text>
+            <View style={styles.modalActions}>
+              {rankOptions.map((option) => (
+                <Pressable
+                  key={option}
+                  style={[styles.secondaryBtn, rank === option && styles.sectionChipActive]}
+                  onPress={() => {
+                    setRank(option);
+                    setRankPickerVisible(false);
+                  }}
+                >
+                  <Text style={[styles.secondaryBtnText, rank === option && styles.sectionTextActive]}>{option}</Text>
+                </Pressable>
+              ))}
+              <Pressable style={styles.secondaryBtn} onPress={() => setRankPickerVisible(false)}>
+                <Text style={styles.secondaryBtnText}>Annuler</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -195,6 +239,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     fontSize: 16,
     marginBottom: 10
+  },
+  inputValueText: {
+    color: colors.text,
+    fontSize: 16
+  },
+  inputPlaceholderText: {
+    color: colors.muted,
+    fontSize: 16
   },
   label: {
     color: colors.text,
@@ -288,5 +340,3 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   }
 });
-
-// test

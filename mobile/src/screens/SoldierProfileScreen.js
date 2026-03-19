@@ -10,6 +10,12 @@ const CATEGORY_LABELS = {
   SERGENT: "Sergent",
   MILITAIRE_DU_RANG: "MDR"
 };
+const AVAILABILITY_LABELS = {
+  PRESENT: "Présent",
+  ABSENT: "Absent",
+  MISSION: "En mission",
+  PERMISSION: "Permission"
+};
 
 const CATEGORIES = [
   "CHEF_DE_SECTION",
@@ -114,6 +120,8 @@ export default function SoldierProfileScreen({ route, navigation }) {
         <Text style={styles.line}>Grade: {soldier.rank}</Text>
         <Text style={styles.line}>Section: {soldier.section}</Text>
         <Text style={styles.line}>Catégorie: {CATEGORY_LABELS[soldier.commandCategory] || "MDR"}</Text>
+        <Text style={styles.line}>Statut: {AVAILABILITY_LABELS[soldier.availability] || "Présent"}</Text>
+        <Text style={styles.line}>Position: {soldier.currentPosition || "Non renseignée"}</Text>
       </View>
 
       {isAdminLike ? (

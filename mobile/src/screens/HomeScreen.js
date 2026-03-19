@@ -16,23 +16,27 @@ export default function HomeScreen({ navigation }) {
   const { session } = useAuth();
   const isAdmin = session?.user?.role === "ADMIN";
   const isAdminLike = isAdmin || session?.user?.role === "MANAGER";
+  const mySoldierId = session?.user?.soldierId || null;
   const [unit, setUnit] = useState(null);
   const [sections, setSections] = useState([]);
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0);
+  const [mySectionId, setMySectionId] = useState(null);
   const [error, setError] = useState("");
 
   const loadHome = useCallback(() => {
     setError("");
-    Promise.all([fetchJson("/unit"), fetchJson("/sections"), fetchJson("/announcements")])
-      .then(([unitData, sectionData, announcementData]) => {
+    const mySoldierPromise = mySoldierId ? fetchJson(`/soldiers/${mySoldierId}`) : Promise.resolve(null);
+    Promise.all([fetchJson("/unit"), fetchJson("/sections"), fetchJson("/announcements"), mySoldierPromise])
+      .then(([unitData, sectionData, announcementData, mySoldier]) => {
         setUnit(unitData);
         setSections(sectionData);
         setAnnouncementUnreadCount(announcementData?.unreadCount || 0);
+        setMySectionId(mySoldier?.sectionId || null);
       })
       .catch((err) => {
         setError(err.message);
       });
-  }, []);
+  }, [mySoldierId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,9 +97,10 @@ export default function HomeScreen({ navigation }) {
       {sections.map((section) => (
         <Pressable
           key={section.id}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, mySectionId === section.id && styles.sectionCardMine]}
           onPress={() => navigation.navigate("Section", { sectionId: section.id, sectionName: section.name })}
         >
+          {mySectionId === section.id ? <Text style={styles.mySectionTag}>Votre section</Text> : null}
           <Text style={styles.sectionName}>{section.name}</Text>
           <Text style={styles.sectionMeta}>{section.soldierCount} militaires</Text>
         </Pressable>
@@ -272,6 +277,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 10
+  },
+  sectionCardMine: {
+    borderColor: "#7fa67a",
+    backgroundColor: "#213223"
+  },
+  mySectionTag: {
+    color: "#b9db98",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 6
   },
   sectionName: {
     color: colors.text,
