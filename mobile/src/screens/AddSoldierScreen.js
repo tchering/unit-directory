@@ -15,7 +15,8 @@ const CATEGORIES = [
 const RANK_OPTIONS_BY_CATEGORY = {
   MILITAIRE_DU_RANG: ["Soldat", "1er classe", "Cpl", "BCH", "CC1"],
   CHEF_DE_SECTION: ["Ltn", "Maj", "Adc", "Adj", "MDL/C(BM2)", "MDL/C", "MDL"],
-  SOUS_OFFICIER_ADJOINT: ["Adj", "MDL/C(BM2)", "MDL/C", "MDL"]
+  SOUS_OFFICIER_ADJOINT: ["Adj", "MDL/C(BM2)", "MDL/C", "MDL"],
+  SERGENT: ["MDL"]
 };
 
 export default function AddSoldierScreen({ navigation }) {
