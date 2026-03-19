@@ -2,7 +2,10 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { prisma } from "./prisma.js";
 import { hashPassword, issueAuthTokens, revokeAllUserRefreshTokens, revokeRefreshToken, rotateRefreshToken, verifyPassword } from "./auth.js";
 import { requireAuth, requireRole } from "./authMiddleware.js";
@@ -11,12 +14,17 @@ import { registerPushToken, sendAnnouncementPush, unregisterPushToken } from "./
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.resolve(__dirname, "../uploads");
+const soldierUploadDir = path.join(uploadsRoot, "soldiers");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: "200kb" }));
+app.use(express.json({ limit: "8mb" }));
+app.use("/uploads", express.static(uploadsRoot));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -70,6 +78,45 @@ function isStrongPassword(password) {
     && /[0-9]/.test(password)
     && /[^A-Za-z0-9]/.test(password)
   );
+}
+
+function buildPublicBaseUrl(req) {
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+function parseDataUrlImage(dataUrl) {
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+  if (!match) {
+    return null;
+  }
+  const type = match[1].toLowerCase();
+  const ext = type === "jpeg" ? "jpg" : type;
+  const buffer = Buffer.from(match[2], "base64");
+  return { ext, buffer };
+}
+
+async function safelyDeleteLocalSoldierPhoto(photoUrl, req) {
+  if (!photoUrl) {
+    return;
+  }
+  const base = buildPublicBaseUrl(req);
+  let relativePath = null;
+  if (photoUrl.startsWith(`${base}/uploads/soldiers/`)) {
+    relativePath = photoUrl.replace(`${base}/uploads/soldiers/`, "");
+  } else if (photoUrl.startsWith("/uploads/soldiers/")) {
+    relativePath = photoUrl.replace("/uploads/soldiers/", "");
+  }
+
+  if (!relativePath) {
+    return;
+  }
+
+  const filePath = path.join(soldierUploadDir, path.basename(relativePath));
+  try {
+    await fs.unlink(filePath);
+  } catch (_error) {
+    // Ignore if old file does not exist.
+  }
 }
 
 app.post("/api/auth/login", authLimiter, asyncHandler(async (req, res) => {
@@ -943,6 +990,90 @@ app.patch("/api/announcements/:id", requireAuth, requireRole("ADMIN", "MANAGER")
   });
 
   res.json(updated);
+}));
+
+app.patch("/api/soldiers/:id/photo", requireAuth, asyncHandler(async (req, res) => {
+  const soldierId = String(req.params.id);
+  const isAdminLike = req.auth.role === "ADMIN" || req.auth.role === "MANAGER";
+  const photoDataUrl = (req.body?.photoDataUrl || "").toString().trim();
+  const photoUrl = (req.body?.photoUrl || "").toString().trim();
+
+  if (!photoDataUrl && !photoUrl) {
+    res.status(400).json({ message: "photoDataUrl ou photoUrl est requis" });
+    return;
+  }
+
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: soldierId },
+    include: { section: true }
+  });
+  if (!soldier) {
+    res.status(404).json({ message: "Militaire introuvable" });
+    return;
+  }
+
+  if (!isAdminLike) {
+    const ownSoldierId = await resolveUserSoldierId(req.auth.userId);
+    if (!ownSoldierId || ownSoldierId !== soldierId) {
+      res.status(403).json({ message: "Accès interdit" });
+      return;
+    }
+  }
+
+  let nextPhoto = photoUrl;
+  if (photoDataUrl) {
+    const parsed = parseDataUrlImage(photoDataUrl);
+    if (!parsed) {
+      res.status(400).json({ message: "Format image invalide (jpeg/png/webp base64 attendu)" });
+      return;
+    }
+    if (parsed.buffer.length > 3 * 1024 * 1024) {
+      res.status(400).json({ message: "Image trop volumineuse (max 3MB)" });
+      return;
+    }
+
+    await fs.mkdir(soldierUploadDir, { recursive: true });
+    const filename = `${soldier.id}-${Date.now()}-${randomBytes(4).toString("hex")}.${parsed.ext}`;
+    const absolutePath = path.join(soldierUploadDir, filename);
+    await fs.writeFile(absolutePath, parsed.buffer);
+    nextPhoto = `${buildPublicBaseUrl(req)}/uploads/soldiers/${filename}`;
+  } else if (!/^https?:\/\//i.test(photoUrl) && !photoUrl.startsWith("/uploads/soldiers/")) {
+    res.status(400).json({ message: "photoUrl invalide" });
+    return;
+  }
+
+  const updated = await prisma.soldier.update({
+    where: { id: soldier.id },
+    data: { photo: nextPhoto }
+  });
+
+  if (photoDataUrl) {
+    await safelyDeleteLocalSoldierPhoto(soldier.photo, req);
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE_SOLDIER_PHOTO",
+      entity: "Soldier",
+      entityId: updated.id,
+      actorId: req.auth.userId,
+      details: { byRole: req.auth.role }
+    }
+  });
+
+  res.json({
+    id: updated.id,
+    name: updated.name,
+    fullName: updated.fullName,
+    rank: updated.rank,
+    photo: updated.photo,
+    commandCategory: updated.commandCategory,
+    sectionId: updated.sectionId,
+    section: soldier.section.name,
+    currentPosition: updated.currentPosition,
+    availability: updated.availability,
+    positionUpdatedAt: updated.positionUpdatedAt
+  });
 }));
 
 app.post("/api/announcements/:id/read", requireAuth, asyncHandler(async (req, res) => {

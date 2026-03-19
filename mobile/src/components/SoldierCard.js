@@ -21,6 +21,7 @@ export default function SoldierCard({
   actionLabel,
   onActionPress,
   disableAction,
+  compactAction = false,
   isCurrentUser = false,
   currentUserLabel = "Vous"
 }) {
@@ -55,11 +56,14 @@ export default function SoldierCard({
       </Pressable>
       {actionLabel && onActionPress ? (
         <Pressable
-          style={[styles.actionBtn, disableAction && styles.actionBtnDisabled]}
+          style={[
+            compactAction ? styles.actionBtnCompact : styles.actionBtn,
+            disableAction && styles.actionBtnDisabled
+          ]}
           onPress={onActionPress}
           disabled={disableAction}
         >
-          <Text style={styles.actionBtnText}>{actionLabel}</Text>
+          <Text style={compactAction ? styles.actionBtnTextCompact : styles.actionBtnText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -72,9 +76,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 14,
-    padding: 12,
-    gap: 10,
-    marginBottom: 12
+    padding: 8,
+    gap: 6,
+    marginBottom: 9
   },
   cardCurrentUser: {
     backgroundColor: "#1a2b22",
@@ -83,12 +87,12 @@ const styles = StyleSheet.create({
   },
   mainTap: {
     flexDirection: "row",
-    gap: 12
+    gap: 8
   },
   photo: {
-    width: 88,
-    height: 88,
-    borderRadius: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border
   },
@@ -106,7 +110,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700"
   },
   currentUserTag: {
@@ -120,43 +124,59 @@ const styles = StyleSheet.create({
   },
   rank: {
     color: colors.muted,
-    marginTop: 2
+    marginTop: 1,
+    fontSize: 12
   },
   statusBadge: {
-    marginTop: 8,
+    marginTop: 4,
     alignSelf: "flex-start",
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4
+    paddingHorizontal: 7,
+    paddingVertical: 2
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800"
   },
   positionText: {
     color: colors.text,
-    marginTop: 6,
-    fontSize: 12
+    marginTop: 3,
+    fontSize: 11
   },
   updatedText: {
     color: colors.muted,
-    marginTop: 4,
-    fontSize: 11
+    marginTop: 2,
+    fontSize: 10
   },
   actionBtn: {
     backgroundColor: "#253a33",
     borderWidth: 1,
     borderColor: "#3f5f53",
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
     alignItems: "center"
+  },
+  actionBtnCompact: {
+    alignSelf: "flex-end",
+    backgroundColor: "#20342f",
+    borderWidth: 1,
+    borderColor: "#3a5a50",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4
   },
   actionBtnDisabled: {
     opacity: 0.55
   },
   actionBtnText: {
     color: "#d7f1e6",
-    fontWeight: "700"
+    fontWeight: "700",
+    fontSize: 11
+  },
+  actionBtnTextCompact: {
+    color: "#d7f1e6",
+    fontWeight: "700",
+    fontSize: 10
   }
 });

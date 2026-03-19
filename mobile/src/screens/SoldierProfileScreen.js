@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { deleteJson, fetchJson, patchJson } from "../api";
 import { colors } from "../theme";
 import { useAuth } from "../AuthContext";
@@ -26,12 +27,14 @@ const CATEGORIES = [
 
 export default function SoldierProfileScreen({ route, navigation }) {
   const { soldierId } = route.params;
-  const { isAdminLike } = useAuth();
+  const { isAdminLike, session } = useAuth();
+  const [mySoldierId, setMySoldierId] = useState(session?.user?.soldierId || null);
   const [soldier, setSoldier] = useState(null);
   const [sections, setSections] = useState([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("MILITAIRE_DU_RANG");
   const [working, setWorking] = useState(false);
+  const [photoWorking, setPhotoWorking] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -53,6 +56,74 @@ export default function SoldierProfileScreen({ route, navigation }) {
         });
     }
   }, [isAdminLike, soldierId]);
+
+  useEffect(() => {
+    if (isAdminLike || mySoldierId) {
+      return;
+    }
+    fetchJson("/auth/me")
+      .then((me) => setMySoldierId(me?.soldierId || null))
+      .catch(() => {
+        // Non bloquant: le backend appliquera quand même les permissions.
+      });
+  }, [isAdminLike, mySoldierId]);
+
+  const canChangePhoto = Boolean(
+    isAdminLike || (mySoldierId && mySoldierId === soldier?.id)
+  );
+  const canSeePhotoAction = Boolean(session?.user?.id);
+
+  async function changePhoto() {
+    if (!soldier || photoWorking) {
+      return;
+    }
+    if (!canChangePhoto) {
+      Alert.alert(
+        "Accès limité",
+        "Vous pouvez changer uniquement votre propre photo de profil."
+      );
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission requise", "Autorisez l'accès aux photos pour changer la photo du profil.");
+      return;
+    }
+
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.65,
+      base64: true
+    });
+
+    if (picked.canceled || !picked.assets?.length) {
+      return;
+    }
+
+    const asset = picked.assets[0];
+    if (!asset.base64) {
+      Alert.alert("Erreur", "Impossible de lire l'image sélectionnée.");
+      return;
+    }
+
+    const mime = asset.mimeType || "image/jpeg";
+    const photoDataUrl = `data:${mime};base64,${asset.base64}`;
+
+    setPhotoWorking(true);
+    setError("");
+    try {
+      const updated = await patchJson(`/soldiers/${soldier.id}/photo`, { photoDataUrl });
+      setSoldier(updated);
+      Alert.alert("Succès", "Photo mise à jour.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPhotoWorking(false);
+    }
+  }
 
   async function moveSoldier() {
     if (!isAdminLike || !soldier || working) {
@@ -113,7 +184,18 @@ export default function SoldierProfileScreen({ route, navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
-      <Image source={{ uri: soldier.photo }} style={styles.photo} />
+      <View>
+        <Image source={{ uri: soldier.photo }} style={styles.photo} />
+        {canSeePhotoAction ? (
+          <Pressable
+            style={[styles.photoEditBtn, (!canChangePhoto || photoWorking) && styles.disabledBtn]}
+            onPress={changePhoto}
+            disabled={photoWorking}
+          >
+            <Text style={styles.photoEditBtnText}>{photoWorking ? "Upload..." : "Changer la photo"}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.panel}>
         <Text style={styles.eyebrow}>Profil militaire</Text>
         <Text style={styles.name}>{soldier.fullName}</Text>
@@ -193,6 +275,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 14
+  },
+  photoEditBtn: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    backgroundColor: "#1d2f29",
+    borderWidth: 1,
+    borderColor: "#3b5f53",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  photoEditBtnText: {
+    color: "#d7f1e6",
+    fontSize: 12,
+    fontWeight: "700"
   },
   eyebrow: {
     color: colors.accent,

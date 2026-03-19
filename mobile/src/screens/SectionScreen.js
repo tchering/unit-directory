@@ -129,9 +129,10 @@ export default function SectionScreen({ navigation, route }) {
                   <SoldierCard
                     soldier={soldier}
                     onPress={() => navigation.navigate("Soldier", { soldierId: soldier.id })}
-                    actionLabel={canEdit ? "Mettre à jour position" : null}
+                    actionLabel={canEdit ? "Modifier" : null}
                     onActionPress={canEdit ? () => openEditor(soldier) : null}
                     disableAction={saving}
+                    compactAction
                     isCurrentUser={Boolean(mySoldierId) && mySoldierId === soldier.id}
                     currentUserLabel="Vous"
                   />
@@ -208,13 +209,13 @@ const styles = StyleSheet.create({
     padding: 16
   },
   group: {
-    marginBottom: 12
+    marginBottom: 9
   },
   groupTitle: {
     color: colors.accent,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
-    marginBottom: 8
+    marginBottom: 6
   },
   empty: {
     color: colors.muted,
@@ -225,21 +226,21 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   editorPanel: {
-    marginTop: -2,
-    marginBottom: 12,
+    marginTop: -4,
+    marginBottom: 9,
     backgroundColor: "#1a1f1f",
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 10
+    padding: 8
   },
   editorLabel: {
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    marginBottom: 6,
-    marginTop: 6
+    marginBottom: 4,
+    marginTop: 4
   },
   input: {
     backgroundColor: colors.surfaceAlt,
@@ -247,28 +248,29 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    fontSize: 12
   },
   inputDisabled: {
     opacity: 0.55
   },
   inputHint: {
     color: colors.muted,
-    marginTop: 6,
-    fontSize: 12
+    marginTop: 4,
+    fontSize: 11
   },
   chipsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7
+    gap: 6
   },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     backgroundColor: colors.surfaceAlt
   },
   chipActive: {
@@ -278,26 +280,27 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.text,
     fontWeight: "700",
-    fontSize: 12
+    fontSize: 11
   },
   chipTextActive: {
     color: "#1b260f"
   },
   editorActions: {
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: "row",
-    gap: 8
+    gap: 6
   },
   saveBtn: {
     flex: 1,
     backgroundColor: colors.accent,
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: "center"
   },
   saveBtnText: {
     color: "#1b260f",
-    fontWeight: "800"
+    fontWeight: "800",
+    fontSize: 12
   },
   cancelBtn: {
     flex: 1,
@@ -305,12 +308,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: "center"
   },
   cancelBtnText: {
     color: colors.text,
-    fontWeight: "700"
+    fontWeight: "700",
+    fontSize: 12
   },
   disabledBtn: {
     opacity: 0.6
