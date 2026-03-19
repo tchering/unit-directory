@@ -252,6 +252,31 @@ async function resolveUserSoldierId(userId) {
   return credential?.soldierId || null;
 }
 
+async function resolveUserSectionId(userId) {
+  const soldierId = await resolveUserSoldierId(userId);
+  if (!soldierId) {
+    return null;
+  }
+  const soldier = await prisma.soldier.findUnique({
+    where: { id: soldierId },
+    select: { sectionId: true }
+  });
+  return soldier?.sectionId || null;
+}
+
+function buildAnnouncementVisibilityWhere(isAdminLike, userSectionId) {
+  if (isAdminLike) {
+    return {};
+  }
+  return {
+    OR: [
+      { scope: "REGIMENT" },
+      { scope: "COMPANY" },
+      ...(userSectionId ? [{ scope: "SECTION", sectionId: userSectionId }] : [])
+    ]
+  };
+}
+
 app.patch("/api/soldiers/:id/position", requireAuth, asyncHandler(async (req, res) => {
   const soldierId = String(req.params.id);
   const currentPosition = (req.body?.currentPosition || "").toString().trim();
@@ -693,10 +718,13 @@ app.get("/api/announcements", requireAuth, asyncHandler(async (req, res) => {
   const includeArchived = isAdminLike && req.query.includeArchived === "1";
   const sectionIdQuery = (req.query.sectionId || "").toString().trim();
   const now = new Date();
+  const userSectionId = isAdminLike ? null : await resolveUserSectionId(req.auth.userId);
+  const visibilityWhere = buildAnnouncementVisibilityWhere(isAdminLike, userSectionId);
 
   const where = {
     ...(includeArchived ? {} : { isArchived: false }),
     OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+    ...visibilityWhere,
     ...(sectionIdQuery ? { sectionId: sectionIdQuery } : {})
   };
 
@@ -721,6 +749,7 @@ app.get("/api/announcements", requireAuth, asyncHandler(async (req, res) => {
     where: {
       isArchived: false,
       OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+      ...visibilityWhere,
       NOT: { createdById: req.auth.userId },
       reads: {
         none: { userId: req.auth.userId }
@@ -919,12 +948,21 @@ app.patch("/api/announcements/:id", requireAuth, requireRole("ADMIN", "MANAGER")
 app.post("/api/announcements/:id/read", requireAuth, asyncHandler(async (req, res) => {
   const announcement = await prisma.announcement.findUnique({
     where: { id: req.params.id },
-    select: { id: true, isArchived: true, expiresAt: true }
+    select: { id: true, isArchived: true, expiresAt: true, scope: true, sectionId: true }
   });
 
   if (!announcement || announcement.isArchived || (announcement.expiresAt && announcement.expiresAt < new Date())) {
     res.status(404).json({ message: "Annonce introuvable" });
     return;
+  }
+
+  const isAdminLike = req.auth.role === "ADMIN" || req.auth.role === "MANAGER";
+  if (!isAdminLike && announcement.scope === "SECTION") {
+    const userSectionId = await resolveUserSectionId(req.auth.userId);
+    if (!userSectionId || announcement.sectionId !== userSectionId) {
+      res.status(404).json({ message: "Annonce introuvable" });
+      return;
+    }
   }
 
   const read = await prisma.announcementRead.upsert({
