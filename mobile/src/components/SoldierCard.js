@@ -15,7 +15,15 @@ const AVAILABILITY_COLORS = {
   PERMISSION: "#d6b36a"
 };
 
-export default function SoldierCard({ soldier, onPress, actionLabel, onActionPress, disableAction }) {
+export default function SoldierCard({
+  soldier,
+  onPress,
+  actionLabel,
+  onActionPress,
+  disableAction,
+  isCurrentUser = false,
+  currentUserLabel = "Vous"
+}) {
   const availability = soldier.availability || "PRESENT";
   const availabilityColor = AVAILABILITY_COLORS[availability] || "#8aa0b6";
   const lastUpdated = soldier.positionUpdatedAt
@@ -23,11 +31,14 @@ export default function SoldierCard({ soldier, onPress, actionLabel, onActionPre
     : "";
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isCurrentUser && styles.cardCurrentUser]}>
       <Pressable style={styles.mainTap} onPress={onPress}>
-        <Image source={{ uri: soldier.photo }} style={styles.photo} />
+        <Image source={{ uri: soldier.photo }} style={[styles.photo, isCurrentUser && styles.photoCurrentUser]} />
         <View style={styles.content}>
-          <Text style={styles.name}>{soldier.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{soldier.name}</Text>
+            {isCurrentUser ? <Text style={styles.currentUserTag}>{currentUserLabel}</Text> : null}
+          </View>
           <Text style={styles.rank}>{soldier.rank}</Text>
           <View style={[styles.statusBadge, { borderColor: availabilityColor }]}>
             <Text style={[styles.statusText, { color: availabilityColor }]}>
@@ -65,6 +76,11 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 12
   },
+  cardCurrentUser: {
+    backgroundColor: "#1a2b22",
+    borderColor: colors.accent,
+    borderWidth: 1.5
+  },
   mainTap: {
     flexDirection: "row",
     gap: 12
@@ -76,14 +92,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  photoCurrentUser: {
+    borderColor: colors.accent
+  },
   content: {
     flex: 1,
     justifyContent: "center"
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   name: {
     color: colors.text,
     fontSize: 16,
     fontWeight: "700"
+  },
+  currentUserTag: {
+    backgroundColor: colors.accent,
+    color: "#1b260f",
+    fontSize: 10,
+    fontWeight: "900",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999
   },
   rank: {
     color: colors.muted,

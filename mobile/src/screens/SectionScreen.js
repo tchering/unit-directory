@@ -132,6 +132,8 @@ export default function SectionScreen({ navigation, route }) {
                     actionLabel={canEdit ? "Mettre à jour position" : null}
                     onActionPress={canEdit ? () => openEditor(soldier) : null}
                     disableAction={saving}
+                    isCurrentUser={Boolean(mySoldierId) && mySoldierId === soldier.id}
+                    currentUserLabel="Vous"
                   />
 
                   {isEditing ? (
